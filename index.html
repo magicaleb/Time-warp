@@ -1,0 +1,1066 @@
+<!--
+================================================================================
+TIME WARP — Magic Trick PWA
+A single-file Progressive Web App for iPhone
+================================================================================
+PROJECT OVERVIEW
+----------------
+A magic trick app that displays a fake iPhone lock screen with a clock set
+ahead by a spectator-chosen number of minutes (5–15), then automatically
+rewinds back to the real current time — making it appear as if time itself
+reversed to match their prediction.
+HOW THE TRICK WORKS
+-------------------
+1. Spectator names any number between 5 and 15.
+2. Magician opens the app (appears as a black/off screen).
+3. Magician taps invisible quadrants to secretly encode the number.
+4. Magician taps the bottom third to "wake" the phone.
+5. Lock screen appears showing current time PLUS the chosen number of minutes.
+6. After a configurable delay, the clock ticks back one minute at a time.
+7. It lands exactly on the real current time — which matches every clock in
+the room. The spectator is baffled.
+SECRET INPUT SYSTEM (Quadrant Taps)
+------------------------------------
+The phone appears off (black screen). The magician taps quadrants to add up
+to the spectator's number. Corner values:
+[ TOP-LEFT = 1 ] [ TOP-RIGHT = 2 ]
+[ BOT-LEFT = 5 ] [ BOT-RIGHT = 10 ]
+[ BOTTOM THIRD = CONFIRM ]
+Rules:
+- Taps ADD together (e.g. BR+BL = 10+5 = 15)
+- Tap bottom third at any point to confirm and wake
+- On the 3rd tap anywhere in the input zone, auto-confirms (no 4th tap needed)
+- Up to 3 taps in the input zone before auto-confirm
+Example combos:
+5 = BL (one tap)
+6 = TL + BL (1+5)
+7 = TR + BL (2+5)
+8 = TL + TR + BL (1+2+5) — auto-confirms on 3rd tap
+9 = TL + TR + BR... wait, that's 13. Use TL+TR+BL+...
+Actually: no clean 3-tap path to 9 with these values.
+Workaround: enter 10 (one BR tap + confirm) then mentally note it's
+close enough, or use a force to avoid 9.
+10 = BR (one tap)
+11 = TL + BR (1+10)
+12 = TR + BR (2+10)
+13 = TL + TR + BR (1+2+10) — auto-confirms
+14 = TL + BL + BR... (1+5+10=16, too high). No clean path.
+Workaround: force spectator away from 9 and 14, or accept slight
+imprecision and use 15 instead.
+15 = BL + BR (5+10)
+NOTE: Numbers 9 and 14 cannot be reached cleanly with this system.
+Consider using a psychological force to steer spectators toward reachable
+numbers (10 is the most common free choice in this range).
+APP SCREENS / FLOW
+------------------
+1. SETUP SCREEN — Configure wallpaper, timing, rewind speed, clock position
+2. EDIT MODE — Overlay clock on wallpaper, drag/nudge to exact position,
+adjust font size and weight to match real iOS clock
+3. BLACK SCREEN — Tap quadrants to enter number (invisible to spectator)
+4. LOCK SCREEN — Fake lock screen showing wallpaper + fake time
+5. REWIND — Clock ticks back to real time automatically
+SETUP INSTRUCTIONS (one-time before performing)
+------------------------------------------------
+1. Deploy this file + manifest.json + sw.js to any HTTPS host
+(GitHub Pages, Netlify, Vercel — all free)
+2. Open the URL in Safari on your iPhone
+3. Tap Share → "Add to Home Screen" → name it something innocent like "Clock"
+4. Open from home screen (must be installed as PWA for full-screen mode)
+5. Upload your lock screen wallpaper (photo WITHOUT the clock — use your
+original wallpaper image, not a screenshot)
+6. Use Edit Mode to position and size the clock to exactly match your real
+iOS lock screen clock position
+7. Set your preferred timing (delay before rewind, rewind speed)
+8. Settings are saved to localStorage — only needs to be done once
+PERFORMANCE FLOW
+----------------
+Before the trick: tap Launch from setup screen → phone shows black screen
+During trick: spectator names number → tap quadrants → tap bottom to wake
+Reveal: show them the phone → clock rewinds → matches real time
+Reset: triple-tap top-left corner of lock screen to show reset btn
+TECHNICAL ARCHITECTURE
+----------------------
+- Pure vanilla HTML/CSS/JS — zero dependencies, no build step
+- Single file (this file) contains all HTML, CSS, and JS
+- Companion files needed: manifest.json, sw.js, icon-192.png, icon-512.png
+- PWA features: installable, offline-capable (via service worker), wake lock
+- Clock: single <div> with textContent swap — no animation, instant like iOS
+- Wallpaper: stored as base64 dataURL in memory (not persisted between sessions
+— must re-upload each session; wallpaper is too large for localStorage)
+- Clock position/size/weight: persisted to localStorage key 'tw2'
+- Wake Lock API keeps screen on during performance
+FILE STRUCTURE
+--------------
+timewarp/
+├── index.html ← this file (rename to index.html when deploying)
+├── manifest.json ← PWA manifest (see MANIFEST section below)
+├── sw.js ← Service worker (see SW section below)
+├── icon-192.png ← App icon 192×192
+└── icon-512.png ← App icon 512×512
+MANIFEST.JSON CONTENTS
+----------------------
+{
+"name": "Clock",
+"short_name": "Clock",
+"description": "Clock app",
+"start_url": "/index.html",
+"display": "standalone",
+"background_color": "#000000",
+"theme_color": "#000000",
+"orientation": "portrait",
+"icons": [
+{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+]
+}
+SW.JS CONTENTS
+--------------
+const CACHE = 'timewarp-v1';
+const ASSETS = ['/', '/index.html', '/manifest.json'];
+self.addEventListener('install', e => {
+e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+e.waitUntil(caches.keys().then(keys =>
+Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+));
+self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+});
+KNOWN LIMITATIONS
+-----------------
+- Wallpaper must be re-uploaded each session (localStorage size limit)
+- Numbers 9 and 14 are not reachable with the quadrant system
+- iOS status bar (time, carrier, battery) cannot be hidden from a PWA;
+it renders natively above the app. Set status bar style to "black" in
+the meta tag to get white-on-black which is least distracting.
+- Wake Lock API requires HTTPS and a user gesture to activate
+- App must be installed via "Add to Home Screen" for true full-screen mode;
+running in Safari browser shows browser chrome
+FUTURE IMPROVEMENTS (for GitHub Copilot to implement)
+------------------------------------------------------
+- Persist wallpaper using IndexedDB (no size limit like localStorage)
+- Add a "force number" system / psychological force guide for the magician
+- Swipe gesture support as alternative to quadrant taps
+- Multiple saved wallpaper profiles (different phones/settings)
+- 24-hour clock mode option
+- AM/PM display option
+- Haptic feedback on each quadrant tap (navigator.vibrate)
+- Smooth number confirmation animation before wake
+- Optional: faint dot indicator in corner showing running total during input
+(only visible at extreme viewing angle — for magician only)
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-
+fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- "black" = solid black bar with WHITE text always. Prevents status bar
+text color from conflicting with wallpaper. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Clock">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<title>Clock</title>
+<style>
+/* ------------------------------------------------------------------ */
+/* RESET & BASE */
+/* ------------------------------------------------------------------ */
+* {
+margin: 0;
+padding: 0;
+box-sizing: border-box;
+-webkit-tap-highlight-color: transparent;
+}
+html, body {
+width: 100%;
+height: 100%;
+overflow: hidden;
+background: #000;
+user-select: none;
+-webkit-user-select: none;
+/* -apple-system resolves to SF Pro Display on iOS — correct font for
+matching the real iOS lock screen clock */
+font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+}
+/* ------------------------------------------------------------------ */
+/* SETUP SCREEN */
+/* ------------------------------------------------------------------ */
+#setup {
+position: fixed;
+inset: 0;
+background: #111;
+display: flex;
+flex-direction: column;
+align-items: center;
+z-index: 200;
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
+padding: 0 0 60px;
+}
+#setup.hidden { display: none; }
+.setup-header {
+width: 100%;
+padding: 60px 28px 24px;
+background: linear-gradient(180deg, #0a001f 0%, #111 100%);
+margin-bottom: 20px;
+}
+.setup-eyebrow {
+font-size: 11px;
+font-weight: 600;
+letter-spacing: 2.5px;
+text-transform: uppercase;
+color: rgba(255,255,255,0.3);
+margin-bottom: 6px;
+}
+.setup-title {
+font-size: 30px;
+font-weight: 700;
+color: #fff;
+letter-spacing: -0.5px;
+margin-bottom: 6px;
+}
+.setup-sub {
+font-size: 14px;
+color: rgba(255,255,255,0.4);
+line-height: 1.5;
+}
+.setup-section {
+width: 100%;
+padding: 0 20px 4px;
+}
+.section-label {
+font-size: 11px;
+font-weight: 600;
+letter-spacing: 1.5px;
+text-transform: uppercase;
+color: rgba(255,255,255,0.28);
+padding: 0 4px;
+margin-bottom: 10px;
+}
+/* Wallpaper upload card */
+.upload-card {
+width: 100%;
+background: rgba(255,255,255,0.05);
+border: 1.5px dashed rgba(255,255,255,0.18);
+border-radius: 18px;
+padding: 28px 20px;
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 10px;
+cursor: pointer;
+position: relative;
+overflow: hidden;
+}
+.upload-card.has-image {
+border-style: solid;
+border-color: rgba(80,220,120,0.5);
+padding: 0;
+aspect-ratio: 9/19.5;
+max-height: 220px;
+}
+.upload-card.has-image img {
+width: 100%;
+height: 100%;
+object-fit: cover;
+border-radius: 16px;
+display: block;
+}
+.upload-card.has-image .upload-overlay {
+position: absolute;
+bottom: 0; left: 0; right: 0;
+background: linear-gradient(transparent, rgba(0,0,0,0.65));
+color: #fff;
+font-size: 13px;
+font-weight: 500;
+padding: 20px 12px 12px;
+border-radius: 0 0 16px 16px;
+text-align: center;
+}
+.upload-icon { font-size: 34px; }
+.upload-title { font-size: 16px; font-weight: 600; color: #fff; }
+.upload-hint { font-size: 13px; color: rgba(255,255,255,0.35); text-align:
+center; line-height: 1.4; }
+#wallpaperInput { display: none; }
+/* Settings rows */
+.settings-row {
+width: 100%;
+background: rgba(255,255,255,0.05);
+border: 1px solid rgba(255,255,255,0.08);
+border-radius: 14px;
+padding: 14px 16px;
+margin-bottom: 8px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+}
+.row-label { font-size: 14px; color: rgba(255,255,255,0.7); font-weight:
+500; }
+.row-label small { display: block; font-size: 11px; color:
+rgba(255,255,255,0.3); margin-top: 2px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.step-btn {
+width: 30px; height: 30px;
+border-radius: 50%;
+border: 1.5px solid rgba(255,255,255,0.2);
+background: rgba(255,255,255,0.08);
+color: #fff;
+font-size: 18px;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+transition: all 0.1s;
+}
+.step-btn:active { transform: scale(0.88); }
+.step-val {
+font-size: 16px;
+font-weight: 700;
+color: #fff;
+min-width: 28px;
+text-align: center;
+}
+.speed-sel {
+background: rgba(255,255,255,0.08);
+border: 1px solid rgba(255,255,255,0.15);
+border-radius: 8px;
+color: #fff;
+font-size: 13px;
+padding: 6px 10px;
+-webkit-appearance: none;
+}
+/* Edit mode button */
+.align-btn {
+width: 100%;
+padding: 14px;
+border-radius: 14px;
+background: rgba(255,160,0,0.12);
+border: 1.5px solid rgba(255,160,0,0.35);
+color: rgba(255,200,70,1);
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+margin-bottom: 8px;
+transition: all 0.2s;
+}
+.align-btn:active { transform: scale(0.98); }
+/* Launch button — always ready (wallpaper check happens on tap) */
+.launch-btn {
+width: 100%;
+padding: 18px;
+border-radius: 16px;
+border: none;
+background: linear-gradient(135deg, #0077ff, #00c6ff);
+color: #fff;
+font-size: 17px;
+font-weight: 700;
+cursor: pointer;
+box-shadow: 0 8px 28px rgba(0,120,255,0.3);
+transition: all 0.2s;
+}
+.launch-btn:active { transform: scale(0.97); }
+/* ------------------------------------------------------------------ */
+/* BLACK SCREEN — phone appears off, invisible quadrant input */
+/* ------------------------------------------------------------------ */
+#blackScreen {
+position: fixed;
+inset: 0;
+background: #000;
+z-index: 300;
+display: none;
+}
+#blackScreen.active { display: block; }
+/* ------------------------------------------------------------------ */
+/* LOCK SCREEN */
+/* ------------------------------------------------------------------ */
+#lockscreen {
+position: fixed;
+inset: 0;
+display: none;
+overflow: hidden;
+}
+#lockscreen.visible { display: block; }
+/* Wake animation — scales in from slightly enlarged, like a real phone
+waking from sleep */
+#lockscreen.waking {
+animation: wakeUp 0.45s cubic-bezier(0.2, 0, 0.4, 1) forwards;
+}
+@keyframes wakeUp {
+0% { opacity: 0; transform: scale(1.04); }
+100% { opacity: 1; transform: scale(1); }
+}
+/* Wallpaper fills entire screen */
+#wallpaperBg {
+position: absolute;
+inset: 0;
+background-size: cover;
+background-position: center top;
+background-repeat: no-repeat;
+}
+/* ------------------------------------------------------------------ */
+/* CLOCK OVERLAY */
+/* Single <div> — textContent swap only, no animation, no child spans. */
+/* Position and font set via JS from saved settings. */
+/* ------------------------------------------------------------------ */
+#clockOverlay {
+position: absolute;
+/* Default position — overridden by saved settings */
+left: 50%;
+top: 16%;
+transform: translateX(-50%);
+z-index: 15;
+white-space: nowrap;
+touch-action: none;
+}
+#clockTime {
+color: #fff;
+font-variant-numeric: tabular-nums;
+line-height: 1;
+text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+/* font-size and font-weight set dynamically via JS */
+}
+/* ------------------------------------------------------------------ */
+/* EDIT MODE — drag handle and toolbar */
+/* ------------------------------------------------------------------ */
+/* Yellow bounding box around clock — drag to reposition */
+#editHandle {
+position: absolute;
+border: 2px solid rgba(255,220,0,0.9);
+border-radius: 10px;
+box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 0 22px rgba(255,220,0,0.2);
+cursor: grab;
+touch-action: none;
+z-index: 50;
+display: none;
+transform: translate(-50%, -50%);
+}
+#editHandle.active { display: block; }
+#editHandle:active { cursor: grabbing; }
+/* Bottom toolbar shown during edit mode */
+#editToolbar {
+position: fixed;
+bottom: 0; left: 0; right: 0;
+padding: 16px 20px;
+padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 14px);
+background: rgba(8,8,8,0.9);
+backdrop-filter: blur(24px);
+-webkit-backdrop-filter: blur(24px);
+border-top: 1px solid rgba(255,255,255,0.08);
+z-index: 100;
+display: none;
+flex-direction: column;
+gap: 12px;
+}
+#editToolbar.active { display: flex; }
+.tb-title {
+font-size: 12px;
+font-weight: 600;
+letter-spacing: 1px;
+color: rgba(255,210,0,0.85);
+text-align: center;
+text-transform: uppercase;
+}
+/* D-pad nudge grid */
+.nudge-grid {
+display: grid;
+grid-template-columns: 1fr 1fr 1fr;
+gap: 8px;
+width: 160px;
+margin: 0 auto;
+}
+.nudge-btn {
+height: 42px;
+border-radius: 10px;
+background: rgba(255,255,255,0.09);
+border: 1px solid rgba(255,255,255,0.12);
+color: #fff;
+font-size: 18px;
+cursor: pointer;
+display: flex; align-items: center; justify-content: center;
+}
+.nudge-btn:active { background: rgba(255,255,255,0.22); transform:
+scale(0.92); }
+.nudge-spacer { background: none !important; border: none !important;
+pointer-events: none; }
+.tb-row {
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 14px;
+}
+.tb-label { font-size: 11px; color: rgba(255,255,255,0.35); text-transform:
+uppercase; letter-spacing: 1px; }
+.tb-btn {
+padding: 8px 20px;
+border-radius: 10px;
+background: rgba(255,255,255,0.09);
+border: 1px solid rgba(255,255,255,0.12);
+color: #fff;
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+}
+.tb-btn:active { background: rgba(255,255,255,0.22); }
+.tb-val { font-size: 15px; font-weight: 700; color: #fff; min-width: 36px;
+text-align: center; }
+.tb-done {
+width: 100%;
+padding: 15px;
+border-radius: 14px;
+background: rgba(255,215,0,0.15);
+border: 1.5px solid rgba(255,215,0,0.5);
+color: rgba(255,230,60,1);
+font-size: 16px;
+font-weight: 700;
+cursor: pointer;
+}
+.tb-done:active { background: rgba(255,215,0,0.28); }
+/* ------------------------------------------------------------------ */
+/* SECRET RESET BUTTON */
+/* Hidden — revealed by triple-tapping the top-left corner of the */
+/* lock screen. Lets magician reset between performances. */
+/* ------------------------------------------------------------------ */
+#secretReset {
+position: fixed;
+bottom: calc(env(safe-area-inset-bottom, 20px) + 80px);
+right: 18px;
+width: 40px; height: 40px;
+border-radius: 50%;
+background: rgba(0,0,0,0.5);
+border: 1px solid rgba(255,255,255,0.15);
+color: rgba(255,255,255,0.55);
+font-size: 16px;
+display: none;
+align-items: center;
+justify-content: center;
+z-index: 60;
+cursor: pointer;
+backdrop-filter: blur(10px);
+}
+#secretReset.show { display: flex; }
+</style>
+</head>
+<body>
+<!-- ==================================================================
+SETUP SCREEN
+================================================================== -->
+<div id="setup">
+<div class="setup-header">
+<div class="setup-eyebrow">Time Warp</div>
+<div class="setup-title">Setup</div>
+<div class="setup-sub">Upload your wallpaper, dial in timing, position the
+clock.</div>
+</div>
+<!-- Step 1: Wallpaper -->
+<div class="setup-section">
+<div class="section-label">1 — Wallpaper (no clock)</div>
+<div class="upload-card" id="uploadCard"
+onclick="document.getElementById('wallpaperInput').click()">
+<div class="upload-icon"> </div>
+<div class="upload-title">Tap to upload</div>
+<div class="upload-hint">Your lock screen background without the time
+showing.</div>
+</div>
+<input type="file" id="wallpaperInput" accept="image/*">
+</div>
+<div style="height:22px"></div>
+<!-- Step 2: Timing -->
+<div class="setup-section">
+<div class="section-label">2 — Timing</div>
+<div class="settings-row">
+<div class="row-label">
+Wait before rewind
+<small>Seconds of drama before clock rolls back</small>
+</div>
+<div class="stepper">
+<button class="step-btn" id="delayMinus">−</button>
+<span class="step-val" id="delayVal">8</span>
+<button class="step-btn" id="delayPlus">+</button>
+</div>
+</div>
+<div class="settings-row">
+<div class="row-label">
+Rewind speed
+<small>Pause between each minute tick</small>
+</div>
+<select class="speed-sel" id="speedSel">
+<option value="700">Slow (0.7s)</option>
+<option value="500" selected>Medium (0.5s)</option>
+<option value="300">Fast (0.3s)</option>
+<option value="150">Very fast</option>
+</select>
+</div>
+</div>
+<div style="height:18px"></div>
+<!-- Step 3: Edit Mode -->
+<div class="setup-section">
+<div class="section-label">3 — Position &amp; Style</div>
+<button class="align-btn" id="alignBtn"> Open Edit Mode</button>
+</div>
+<div style="height:18px"></div>
+<!-- Launch -->
+<div class="setup-section">
+<div class="setup-sub" style="padding:0 4px; margin-bottom:14px;">
+Tap Launch when ready to perform. The screen goes black — tap the
+quadrants to silently enter their number, then tap the bottom to wake.
+</div>
+<button class="launch-btn" id="launchBtn">Launch →</button>
+</div>
+</div><!-- /#setup -->
+<!-- ==================================================================
+BLACK SCREEN — appears as phone being off
+Invisible quadrant tap zones encode the spectator's number.
+Layout of tap zones (top 2/3 of screen):
+[ TL = +1 | TR = +2 ]
+[ BL = +5 | BR = +10 ]
+[ BOTTOM THIRD ] ← tap to confirm / wake
+================================================================== -->
+<div id="blackScreen"></div>
+<!-- ==================================================================
+LOCK SCREEN — wallpaper + clock only
+================================================================== -->
+<div id="lockscreen">
+<!-- Wallpaper image as CSS background -->
+<div id="wallpaperBg"></div>
+<!-- The clock. Single div, textContent only. Font size/weight/position
+set via JS from saved settings. No child elements. -->
+<div id="clockOverlay">
+<div id="clockTime"></div>
+</div>
+<!-- Edit mode drag handle (only visible during edit mode) -->
+<div id="editHandle"></div>
+</div><!-- /#lockscreen -->
+<!-- ==================================================================
+EDIT MODE TOOLBAR — shown overlaid on lock screen during positioning
+================================================================== -->
+<div id="editToolbar">
+<div class="tb-title">Drag clock or nudge — position &amp; style</div>
+<!-- D-pad for pixel nudging -->
+<div class="nudge-grid">
+<div class="nudge-spacer nudge-btn"></div>
+<button class="nudge-btn"
+ontouchstart="startNudge(0,-3)"
+onmousedown="startNudge(0,-3)">▲</button>
+<div class="nudge-spacer nudge-btn"></div>
+<button class="nudge-btn"
+ontouchstart="startNudge(-3,0)"
+onmousedown="startNudge(-3,0)">◀</button>
+<div class="nudge-spacer nudge-btn"></div>
+<button class="nudge-btn"
+ontouchstart="startNudge(3,0)"
+onmousedown="startNudge(3,0)">▶</button>
+<div class="nudge-spacer nudge-btn"></div>
+<button class="nudge-btn"
+ontouchstart="startNudge(0,3)"
+onmousedown="startNudge(0,3)">▼</button>
+<div class="nudge-spacer nudge-btn"></div>
+</div>
+<!-- Font size control (in vw units) -->
+<div class="tb-row">
+<span class="tb-label">Size</span>
+<button class="tb-btn" onclick="adjSize(-1)">−</button>
+<span class="tb-val" id="sizeVal">22</span>
+<button class="tb-btn" onclick="adjSize(1)">+</button>
+<span class="tb-label">vw</span>
+</div>
+<!-- Font weight control (100–900) -->
+<div class="tb-row">
+<span class="tb-label">Weight</span>
+<button class="tb-btn" onclick="adjWeight(-100)">−</button>
+<span class="tb-val" id="weightVal">100</span>
+<button class="tb-btn" onclick="adjWeight(100)">+</button>
+<span class="tb-label">/900</span>
+</div>
+<button class="tb-done" onclick="doneEditing()">✓ Save &amp; Back</button>
+</div><!-- /#editToolbar -->
+<!-- Secret reset button — revealed by triple-tapping top-left of lock screen --
+>
+<button id="secretReset" onclick="resetAll()">↩</button>
+<!-- ==================================================================
+JAVASCRIPT
+================================================================== -->
+<script>
+// ----------------------------------------------------------------
+// STATE
+// ----------------------------------------------------------------
+let wallpaperDataURL = null; // base64 data URL of uploaded wallpaper
+let chosenNumber = null; // final number entered via quadrant taps
+let delaySeconds = 8; // seconds before rewind starts
+let rewindSpeedMs = 500; // ms between each minute tick during rewind
+let rewindTimer = null; // setTimeout handle for rewind loop
+let wakeLock = null; // Screen Wake Lock API handle
+// Clock appearance — persisted to localStorage
+let clockSizeVw = 22; // font-size in vw units
+let clockWeight = 100; // font-weight (100 = hairline, matches iOS)
+let clockPosX = 50; // horizontal position, % of screen width (center)
+let clockPosY = 16; // vertical position, % of screen height (top edge)
+// Quadrant input state
+let enteredNumber = 0; // running total of quadrant taps
+let tapCount = 0; // number of taps so far (max 3 before auto-confirm)
+// Edit mode
+let nudgeInterval = null; // setInterval handle for held nudge buttons
+// ----------------------------------------------------------------
+// PERSIST / RESTORE CLOCK SETTINGS
+// Wallpaper is NOT persisted (too large for localStorage).
+// Clock position, size, weight ARE persisted.
+// ----------------------------------------------------------------
+function saveSettings() {
+try {
+localStorage.setItem('tw2', JSON.stringify({
+clockSizeVw, clockWeight, clockPosX, clockPosY
+}));
+} catch(e) {}
+}
+function loadSettings() {
+try {
+const s = JSON.parse(localStorage.getItem('tw2') || '{}');
+if (s.clockSizeVw) clockSizeVw = s.clockSizeVw;
+if (s.clockWeight) clockWeight = s.clockWeight;
+if (s.clockPosX !== undefined) clockPosX = s.clockPosX;
+if (s.clockPosY !== undefined) clockPosY = s.clockPosY;
+} catch(e) {}
+}
+loadSettings();
+// ----------------------------------------------------------------
+// WALLPAPER UPLOAD
+// Reads file as base64 dataURL, stores in memory, shows preview.
+// ----------------------------------------------------------------
+document.getElementById('wallpaperInput').addEventListener('change', e => {
+const file = e.target.files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = ev => {
+wallpaperDataURL = ev.target.result;
+const card = document.getElementById('uploadCard');
+card.classList.add('has-image');
+card.innerHTML = `
+<img src="${wallpaperDataURL}" alt="wallpaper">
+<div class="upload-overlay">Tap to change</div>
+`;
+card.onclick = () => document.getElementById('wallpaperInput').click();
+};
+reader.readAsDataURL(file);
+});
+// ----------------------------------------------------------------
+// TIMING SETTINGS
+// ----------------------------------------------------------------
+document.getElementById('delayMinus').onclick = () => {
+if (delaySeconds > 2) {
+delaySeconds--;
+document.getElementById('delayVal').textContent = delaySeconds;
+}
+};
+document.getElementById('delayPlus').onclick = () => {
+if (delaySeconds < 30) {
+delaySeconds++;
+document.getElementById('delayVal').textContent = delaySeconds;
+}
+};
+document.getElementById('speedSel').onchange = e => {
+rewindSpeedMs = parseInt(e.target.value);
+};
+// ----------------------------------------------------------------
+// CLOCK: APPLY STYLE + POSITION
+// Called whenever size, weight, or position changes.
+// ----------------------------------------------------------------
+function applyClockStyle() {
+const overlay = document.getElementById('clockOverlay');
+overlay.style.left = clockPosX + '%';
+overlay.style.top = clockPosY + '%';
+overlay.style.transform = 'translateX(-50%)';
+const timeEl = document.getElementById('clockTime');
+timeEl.style.fontSize = clockSizeVw + 'vw';
+timeEl.style.fontWeight = clockWeight;
+}
+// ----------------------------------------------------------------
+// CLOCK: SET TIME DISPLAY
+// Instant textContent swap — no animation, exactly like iOS.
+// ----------------------------------------------------------------
+function setClockTime(dateObj) {
+let h = dateObj.getHours() % 12 || 12;
+const m = dateObj.getMinutes();
+const ms = m < 10 ? '0' + m : '' + m;
+document.getElementById('clockTime').textContent = h + ':' + ms;
+}
+// ----------------------------------------------------------------
+// EDIT MODE
+// Shows lock screen with yellow drag handle around the clock.
+// Magician can drag or nudge clock to match real iOS position.
+// ----------------------------------------------------------------
+document.getElementById('alignBtn').onclick = () => {
+if (!wallpaperDataURL) {
+alert('Upload your wallpaper first.');
+return;
+}
+openEditMode();
+};
+function openEditMode() {
+document.getElementById('setup').classList.add('hidden');
+document.getElementById('lockscreen').classList.add('visible');
+document.getElementById('wallpaperBg').style.backgroundImage =
+`url(${wallpaperDataURL})`;
+setClockTime(new Date());
+applyClockStyle();
+document.getElementById('editToolbar').classList.add('active');
+document.getElementById('sizeVal').textContent = clockSizeVw;
+document.getElementById('weightVal').textContent = clockWeight;
+positionHandle();
+setupDrag();
+}
+// Position the yellow bounding box handle around the clock element
+function positionHandle() {
+const overlay = document.getElementById('clockOverlay');
+const rect = overlay.getBoundingClientRect();
+const handle = document.getElementById('editHandle');
+handle.style.left = (rect.left + rect.width / 2) + 'px';
+handle.style.top = (rect.top + rect.height / 2) + 'px';
+handle.style.width = (rect.width + 20) + 'px';
+handle.style.height = (rect.height + 16) + 'px';
+handle.classList.add('active');
+}
+// Nudge with held-button auto-repeat
+function startNudge(dx, dy) {
+nudge(dx, dy);
+clearInterval(nudgeInterval);
+nudgeInterval = setInterval(() => nudge(dx, dy), 120);
+const stop = () => clearInterval(nudgeInterval);
+window.addEventListener('touchend', stop, { once: true });
+window.addEventListener('touchcancel',stop, { once: true });
+window.addEventListener('mouseup', stop, { once: true });
+}
+function nudge(dx, dy) {
+const W = window.innerWidth;
+const H = window.innerHeight;
+clockPosX += (dx / W) * 100;
+clockPosY += (dy / H) * 100;
+clockPosX = Math.max(5, Math.min(95, clockPosX));
+clockPosY = Math.max(2, Math.min(88, clockPosY));
+applyClockStyle();
+positionHandle();
+}
+function adjSize(delta) {
+clockSizeVw = Math.max(8, Math.min(38, clockSizeVw + delta));
+document.getElementById('sizeVal').textContent = clockSizeVw;
+applyClockStyle();
+positionHandle();
+}
+function adjWeight(delta) {
+clockWeight = Math.max(100, Math.min(900, clockWeight + delta));
+document.getElementById('weightVal').textContent = clockWeight;
+applyClockStyle();
+positionHandle();
+}
+function doneEditing() {
+saveSettings();
+document.getElementById('editToolbar').classList.remove('active');
+document.getElementById('editHandle').classList.remove('active');
+document.getElementById('lockscreen').classList.remove('visible');
+document.getElementById('setup').classList.remove('hidden');
+}
+// Drag the edit handle to reposition the clock
+function setupDrag() {
+const handle = document.getElementById('editHandle');
+let sx, sy, startPX, startPY;
+function onMove(cx, cy) {
+const W = window.innerWidth;
+const H = window.innerHeight;
+clockPosX = startPX + ((cx - sx) / W) * 100;
+clockPosY = startPY + ((cy - sy) / H) * 100;
+clockPosX = Math.max(5, Math.min(95, clockPosX));
+clockPosY = Math.max(2, Math.min(88, clockPosY));
+applyClockStyle();
+positionHandle();
+}
+handle.addEventListener('touchstart', e => {
+e.preventDefault();
+sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+startPX = clockPosX; startPY = clockPosY;
+}, { passive: false });
+handle.addEventListener('touchmove', e => {
+e.preventDefault();
+onMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+handle.addEventListener('mousedown', e => {
+sx = e.clientX; sy = e.clientY;
+startPX = clockPosX; startPY = clockPosY;
+const onMM = ev => onMove(ev.clientX, ev.clientY);
+const onMU = () => {
+window.removeEventListener('mousemove', onMM);
+window.removeEventListener('mouseup', onMU);
+};
+window.addEventListener('mousemove', onMM);
+window.addEventListener('mouseup', onMU);
+});
+}
+// ----------------------------------------------------------------
+// LAUNCH → BLACK SCREEN
+// ----------------------------------------------------------------
+document.getElementById('launchBtn').onclick = () => {
+if (!wallpaperDataURL) {
+alert('Upload your wallpaper first.');
+return;
+}
+initBlackScreen();
+};
+// ----------------------------------------------------------------
+// BLACK SCREEN + QUADRANT TAP INPUT
+//
+// Zones (top 2/3 of screen divided into 4 quadrants):
+// Top-left = +1
+// Top-right = +2
+// Bottom-left = +5
+// Bottom-right = +10
+//
+// Bottom third of screen = CONFIRM and wake up
+//
+// After 3 taps in the input zone, auto-confirms (no confirm tap needed)
+// ----------------------------------------------------------------
+function initBlackScreen() {
+enteredNumber = 0;
+tapCount = 0;
+const bs = document.getElementById('blackScreen');
+bs.classList.add('active');
+document.getElementById('setup').classList.add('hidden');
+bs.addEventListener('touchend', handleBlackTap, { passive: false });
+bs.addEventListener('click', handleBlackTap);
+}
+function handleBlackTap(e) {
+e.preventDefault();
+// Get tap coordinates (touch or mouse)
+const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+const W = window.innerWidth;
+const H = window.innerHeight;
+const isBottomThird = y > H * (2 / 3);
+if (isBottomThird) {
+// Bottom third = confirm, wake up
+if (enteredNumber < 5) enteredNumber = 5; // enforce minimum
+wakeUp();
+return;
+}
+// Top 2/3 = input zone, split into 4 quadrants
+// Vertical split: top half of input zone vs bottom half of input zone
+const isLeft = x < W / 2;
+const isTop = y < H / 3; // top third = top half of input zone
+let value = 0;
+if (isTop && isLeft) value = 1; // Top-left
+if (isTop && !isLeft) value = 2; // Top-right
+if (!isTop && isLeft) value = 5; // Bottom-left
+if (!isTop && !isLeft) value = 10; // Bottom-right
+enteredNumber += value;
+tapCount++;
+// Auto-confirm after 3rd tap in input zone
+if (tapCount >= 3) {
+if (enteredNumber < 5) enteredNumber = 5;
+wakeUp();
+}
+}
+function wakeUp() {
+chosenNumber = enteredNumber;
+const bs = document.getElementById('blackScreen');
+bs.removeEventListener('touchend', handleBlackTap);
+bs.removeEventListener('click', handleBlackTap);
+bs.classList.remove('active');
+launch();
+}
+// ----------------------------------------------------------------
+// LAUNCH LOCK SCREEN
+// ----------------------------------------------------------------
+function launch() {
+const now = new Date();
+const fake = new Date(now.getTime() + chosenNumber * 60000);
+// Apply wallpaper and clock
+document.getElementById('wallpaperBg').style.backgroundImage =
+`url(${wallpaperDataURL})`;
+setClockTime(fake);
+applyClockStyle();
+// Show lock screen with wake animation
+const ls = document.getElementById('lockscreen');
+ls.classList.add('visible');
+ls.classList.remove('waking');
+void ls.offsetWidth; // force reflow to restart animation
+ls.classList.add('waking');
+requestWakeLock();
+// Start rewind after delay
+setTimeout(() => startRewind(fake, now), delaySeconds * 1000);
+// Secret reset: triple-tap top-left corner
+let secretTaps = 0;
+let secretTimer;
+ls.addEventListener('click', e => {
+if (e.clientX < 60 && e.clientY < 90) {
+secretTaps++;
+clearTimeout(secretTimer);
+secretTimer = setTimeout(() => secretTaps = 0, 600);
+if (secretTaps >= 3) {
+secretTaps = 0;
+document.getElementById('secretReset').classList.toggle('show');
+}
+}
+});
+}
+// ----------------------------------------------------------------
+// REWIND
+// Ticks backwards from fakeTime to realTime, one minute at a time.
+// Each tick is an instant textContent swap — no animation.
+// ----------------------------------------------------------------
+function startRewind(fromTime, toTime) {
+let cur = new Date(fromTime.getTime());
+const tgt = new Date(toTime.getTime());
+// Round both to minute boundaries
+cur.setSeconds(0, 0);
+tgt.setSeconds(0, 0);
+function tick() {
+cur = new Date(cur.getTime() - 60000);
+setClockTime(cur);
+if (cur <= tgt) {
+// Landed — snap to exact real current time
+setClockTime(new Date());
+clearTimeout(rewindTimer);
+} else {
+rewindTimer = setTimeout(tick, rewindSpeedMs);
+}
+}
+// Small initial pause before first tick (slight dramatic effect)
+setTimeout(tick, 350);
+}
+// ----------------------------------------------------------------
+// WAKE LOCK — keeps screen on during performance
+// ----------------------------------------------------------------
+async function requestWakeLock() {
+try {
+if ('wakeLock' in navigator) {
+wakeLock = await navigator.wakeLock.request('screen');
+}
+} catch(e) { /* silently ignore — not critical */ }
+}
+// ----------------------------------------------------------------
+// RESET — return to setup screen
+// Triggered by secret reset button (triple-tap top-left corner)
+// ----------------------------------------------------------------
+function resetAll() {
+clearTimeout(rewindTimer);
+if (wakeLock) { wakeLock.release(); wakeLock = null; }
+document.getElementById('blackScreen').classList.remove('active');
+document.getElementById('lockscreen').classList.remove('visible', 'waking');
+document.getElementById('setup').classList.remove('hidden');
+document.getElementById('secretReset').classList.remove('show');
+document.getElementById('editToolbar').classList.remove('active');
+document.getElementById('editHandle').classList.remove('active');
+chosenNumber = null;
+enteredNumber = 0;
+tapCount = 0;
+}
+// ----------------------------------------------------------------
+// SERVICE WORKER — enables offline use after first load
+// ----------------------------------------------------------------
+if ('serviceWorker' in navigator) {
+navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

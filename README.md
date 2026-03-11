@@ -60,7 +60,7 @@ timewarp/
 1. Open the app from your home screen
 2. **Upload your wallpaper** — use your lock screen background photo *without* the
 clock (use your original wallpaper image, not a screenshot with the time visible)
-3. Tap ** Open Edit Mode** — your wallpaper loads with a yellow box around the
+3. Tap **Open Edit Mode** — your wallpaper loads with a yellow box around the
 clock
 4. **Drag** the clock to match the exact position on your real lock screen
 5. Use **Size** and **Weight** controls to match the font exactly

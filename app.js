@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   clockColor: "#ffffff",
   clockSize: 24,
   clockWeight: 520,
-  clockPosition: 17,
+  clockPosition: 13,
   clockOpacity: 100,
   wallpaperZoom: 100,
   wallpaperX: 50,
@@ -54,6 +54,11 @@ const assistDot = document.getElementById("assistDot");
 const toast = document.getElementById("toast");
 const confirmSheet = document.getElementById("confirmSheet");
 const installNote = document.getElementById("installNote");
+const query = new URLSearchParams(location.search);
+
+if (query.get("frame") === "phone") {
+  document.documentElement.classList.add("qa-phone-frame");
+}
 
 const controls = {
   clockStyle: document.getElementById("clockStyle"),
@@ -663,7 +668,7 @@ function registerServiceWorker() {
 }
 
 function exposeQAControls() {
-  if (!new URLSearchParams(location.search).has("qa")) return;
+  if (!query.has("qa")) return;
   window.__TIMEWARP_QA__ = {
     arm,
     reveal: (choice) => {

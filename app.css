@@ -11,7 +11,7 @@
   --setup-background: #0b0c10;
   --clock-size: 24;
   --clock-weight: 520;
-  --clock-y: 17%;
+  --clock-y: 13%;
   --clock-opacity: 1;
   --clock-color: #ffffff;
   --wallpaper-zoom: 1;
@@ -961,6 +961,15 @@ input[type="range"]::-moz-range-thumb {
   stroke-width: 2;
 }
 
+@media (min-width: 761px) {
+  .arm-dock {
+    right: max(20px, calc((100vw - 1120px) / 2));
+    left: auto;
+    width: min(620px, calc(100% - 430px));
+    transform: none;
+  }
+}
+
 .performance-screen {
   position: fixed;
   z-index: 100;
@@ -977,6 +986,23 @@ input[type="range"]::-moz-range-thumb {
 
 .performance-screen.is-active {
   display: block;
+}
+
+@media (min-width: 700px) {
+  .qa-phone-frame .performance-screen {
+    top: 20px;
+    right: auto;
+    bottom: auto;
+    left: 20px;
+    width: 390px;
+    height: 844px;
+    border-radius: 48px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  }
+
+  .qa-phone-frame .performance-lock-view {
+    border-radius: 48px;
+  }
 }
 
 .armed-screen {

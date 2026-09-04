@@ -1037,15 +1037,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .performance-lock-view .lock-glyph {
-  top: max(12.2cqw, calc(env(safe-area-inset-top) + 20px));
+  top: max(12.2cqw, calc(env(safe-area-inset-top) + 6px));
 }
 
 .performance-lock-view .quick-controls {
-  bottom: max(9cqw, calc(env(safe-area-inset-bottom) + 38px));
+  bottom: max(9cqw, calc(env(safe-area-inset-bottom) + 10px));
 }
 
 .performance-lock-view .home-indicator {
-  bottom: max(2.1cqw, calc(env(safe-area-inset-bottom) + 3px));
+  bottom: max(2.1cqw, 8px);
+}
+
+@media (display-mode: standalone) {
+  .performance-lock-view .home-indicator {
+    display: none;
+  }
 }
 
 .toast {

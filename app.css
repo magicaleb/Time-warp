@@ -243,9 +243,7 @@ button {
 
 .legibility-layer {
   z-index: 1;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 25%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0%, transparent 24%);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0%, transparent 24%);
   pointer-events: none;
 }
 

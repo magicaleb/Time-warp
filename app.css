@@ -5,6 +5,10 @@
   background: #000;
   --accent: #78d7c0;
   --line: #343438;
+  --event-color: #76a8df;
+  --cover-tint-color: #000000;
+  --status-tint-h: 16px;
+  --color-shift-ms: 350ms;
   --wallpaper-image: radial-gradient(circle at 28% 18%, rgba(143,194,255,.9) 0 8%, transparent 31%), radial-gradient(circle at 82% 26%, rgba(246,160,205,.8) 0 5%, transparent 27%), radial-gradient(circle at 48% 86%, rgba(51,107,187,.9), transparent 48%), linear-gradient(145deg,#1d3354 0%,#3b4d79 35%,#6b4d79 68%,#171d33 100%);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -55,15 +59,15 @@ h1 { font-size: 27px; margin: 0; font-weight: 650; }
 .primary { width: 100%; background: var(--accent); color: #0a2520; border-radius: 8px; min-height: 52px; font-size: 17px; font-weight: 650; }
 .exit-hint { display: block; text-align: center; color: #8e8e94; font-size: 11px; padding-top: 10px; }
 .error { color: #ffada8; font-size: 13px; line-height: 1.4; margin: 0 0 10px; }
-.stage { position: fixed; inset: 0; height: 100dvh; overflow: hidden; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; }
+.stage { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; }
 .lock-view { position: absolute; inset: 0; container-type: inline-size; overflow: hidden; isolation: isolate; }
 .wallpaper-layer { position: absolute; inset: 0; background-image: var(--wallpaper-image); background-size: cover; background-position: var(--wallpaper-x,50%) var(--wallpaper-y,50%); transform: scale(var(--wallpaper-zoom,1)); transform-origin: var(--wallpaper-x,50%) var(--wallpaper-y,50%); }
-.lock-text { position: absolute; z-index: 2; width: max-content; max-width: 98%; white-space: nowrap; text-align: center; transform: translate(-50%, -50%); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; line-height: 1; }
-.lock-time { font-size: calc(var(--clock-size,24) * 1cqw); }
-.lock-date { font-size: calc(var(--date-size,4.25) * 1cqw); }
+.lock-text { position: absolute; z-index: 2; width: max-content; max-width: 98%; white-space: nowrap; text-align: center; transform: translate(-50%, -50%); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; font-kerning: normal; font-variant-numeric: proportional-nums; font-feature-settings: "pnum" 1, "tnum" 0; }
+.lock-time { font-size: calc(var(--clock-size,24) * 1cqw); letter-spacing: -.035em; line-height: .86; }
+.lock-date { font-size: calc(var(--date-size,4.25) * 1cqw); letter-spacing: -.012em; line-height: 1.05; }
 .lock-text[data-style=rounded] { font-family: ui-rounded, "SF Pro Rounded", -apple-system, sans-serif; }
 .lock-text[data-style=serif] { font-family: ui-serif, Georgia, serif; }
-.lock-text[data-style=mono] { font-family: ui-monospace, Menlo, monospace; }
+.lock-text[data-style=mono] { font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; letter-spacing: -.025em; }
 .lock-text[data-style=glass] { text-shadow: 0 1px 1px #ffffff66, 0 3px 12px #0004; }
 .editing .lock-text { cursor: grab; touch-action: none; }
 .editing .lock-text.selected { outline: 1px dashed #ffffffa6; outline-offset: 8px; }
@@ -84,6 +88,24 @@ input[type=color] { width: 32px; height: 32px; padding: 0; border: 0; border-rad
 .range-row input { width: 100%; min-width: 0; height: 32px; margin: 0; }
 .range-row output { font-size: 11px; color: #aaaab3; text-align: right; font-variant-numeric: tabular-nums; }
 .reference-row { border-top: 1px solid var(--line); margin-top: 5px; }
+#status-bar-tint { display: none; }
+/* iOS 27 standalone PWAs add a colored blur at the top edge. This thin,
+   fixed overlay masks it without adding padding or shortening the wallpaper. */
+@media (display-mode: standalone) and (orientation: portrait) {
+  .is-ios #status-bar-tint {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--status-tint-h);
+    z-index: 2000;
+    pointer-events: none;
+    background-color: var(--event-color);
+    transition: background-color var(--color-shift-ms) ease-in-out;
+  }
+  .is-ios .stage:has(#coverLayer:not([hidden])) #status-bar-tint { background-color: var(--cover-tint-color); }
+}
 .cover-layer { position: absolute; z-index: 5; inset: 0; background-color: #000; background-position: center; background-size: cover; }
 .stage.waking .lock-view { animation: wake-screen 450ms ease-out both; }
 @keyframes wake-screen { from { opacity: 0; } to { opacity: 1; } }

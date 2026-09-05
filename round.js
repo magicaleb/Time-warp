@@ -1,4 +1,4 @@
-import { dateFromMinute, fakeMinuteFromNow, minuteStamp, nextRewindMinute, isValidChoice, parseMinutes } from "./core.js?v=13";
+import { dateFromMinute, fakeMinuteFromNow, minuteStamp, nextRewindMinute, isValidChoice, parseMinutes } from "./core.js?v=14";
 
 // Every round owns its timers and async input. Cancellation invalidates late clipboard results.
 export class Round {

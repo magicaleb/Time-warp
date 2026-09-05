@@ -18,6 +18,9 @@
   --wallpaper-x: 50%;
   --wallpaper-y: 50%;
   --reference-opacity: 0.5;
+  --status-tint-h: max(52px, calc(env(safe-area-inset-top) + 32px));
+  --event-color: #000;
+  --color-shift-ms: 160ms;
   --wallpaper-image:
     radial-gradient(circle at 28% 18%, rgba(143, 194, 255, 0.9) 0 8%, transparent 31%),
     radial-gradient(circle at 82% 26%, rgba(246, 160, 205, 0.8) 0 5%, transparent 27%),
@@ -35,13 +38,8 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: #fff;
-  color: var(--ink);
-}
-
-#app {
-  min-height: 100dvh;
   background: #000;
+  color: var(--ink);
 }
 
 body {
@@ -64,6 +62,26 @@ input[type="range"] {
 
 button {
   color: inherit;
+}
+
+#status-bar-tint {
+  display: none;
+}
+
+/* counteract colored drop shadow on iOS 27 beta status bar */
+@media (display-mode: standalone) and (orientation: portrait) {
+  .is-ios #status-bar-tint {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--status-tint-h);
+    z-index: 2000;
+    pointer-events: none;
+    background-color: var(--event-color);
+    transition: background-color var(--color-shift-ms) ease-in-out;
+  }
 }
 
 .is-hidden {

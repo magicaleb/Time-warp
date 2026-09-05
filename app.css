@@ -35,8 +35,13 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: #000;
+  background: #fff;
   color: var(--ink);
+}
+
+#app {
+  min-height: 100dvh;
+  background: #000;
 }
 
 body {
@@ -243,7 +248,7 @@ button {
 
 .legibility-layer {
   z-index: 1;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0%, transparent 24%);
+  background: none;
   pointer-events: none;
 }
 

@@ -1,8 +1,8 @@
-import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=11";
-import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=11";
-import { readMedia, writeMedia, validateImage } from "./media.js?v=11";
-import { Round } from "./round.js?v=11";
-import { Calculator } from "./calculator.js?v=11";
+import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=12";
+import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=12";
+import { readMedia, writeMedia, validateImage } from "./media.js?v=12";
+import { Round } from "./round.js?v=12";
+import { Calculator } from "./calculator.js?v=12";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -142,7 +142,7 @@ function applyAppearance() {
     const s = settings[part];
     const el = $(part + "Text");
     root.setProperty("--" + part + "-size", s.size);
-    Object.assign(el.style, { left: s.x + "%", top: s.y + "%", fontWeight: s.weight, color: s.color, opacity: s.opacity, fontSize: "" });
+    Object.assign(el.style, { left: s.x + "%", top: s.y + "%", fontWeight: s.weight, color: s.color, opacity: s.opacity / 100, fontSize: "" });
     el.dataset.style = s.style;
   }
   $("dateText").hidden = !settings.showDate;

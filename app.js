@@ -1,752 +1,594 @@
-import {
-  dateFromMinute,
-  fakeMinuteFromNow,
-  formatClock,
-  formatLockDate,
-  getInputZone,
-  isValidChoice,
-  minuteStamp,
-  nextRewindMinute,
-} from "./core.js";
+import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=10";
+import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=10";
+import { readMedia, writeMedia, validateImage } from "./media.js?v=10";
+import { Round } from "./round.js?v=10";
+import { Calculator } from "./calculator.js?v=10";
 
-const SETTINGS_KEY = "time-warp.settings.v3";
-const DB_NAME = "time-warp-media";
-const DB_VERSION = 1;
-const STORE_NAME = "assets";
-
-const DEFAULT_SETTINGS = Object.freeze({
-  clockStyle: "system",
-  clockColor: "#ffffff",
-  clockSize: 24,
-  clockWeight: 520,
-  clockPosition: 13,
-  clockOpacity: 100,
-  wallpaperZoom: 100,
-  wallpaperX: 50,
-  wallpaperY: 50,
-  showDate: true,
-  showLock: true,
-  showControls: true,
-  use24Hour: false,
-  rewindDelay: 6,
-  rewindSpeed: 500,
-});
-
-const setupScreen = document.getElementById("setupScreen");
-const armedScreen = document.getElementById("armedScreen");
-const lockScreen = document.getElementById("lockScreen");
-const previewLockView = document.getElementById("previewLockView");
-const performanceLockView = document.getElementById("performanceLockView");
-const lockViews = [previewLockView, performanceLockView];
-const wallpaperLayers = [...document.querySelectorAll(".wallpaper-layer")];
-const referenceLayer = document.getElementById("referenceLayer");
-const referenceOpacityRow = document.getElementById("referenceOpacityRow");
-const toggleReferenceButton = document.getElementById("toggleReferenceButton");
-const wallpaperInput = document.getElementById("wallpaperInput");
-const referenceInput = document.getElementById("referenceInput");
-const wallpaperLabel = document.getElementById("wallpaperLabel");
-const referenceLabel = document.getElementById("referenceLabel");
-const readyPill = document.getElementById("readyPill");
-const armStatus = document.getElementById("armStatus");
-const armButton = document.getElementById("armButton");
-const rehearseButton = document.getElementById("rehearseButton");
-const assistDot = document.getElementById("assistDot");
-const toast = document.getElementById("toast");
-const confirmSheet = document.getElementById("confirmSheet");
-const installNote = document.getElementById("installNote");
-const query = new URLSearchParams(location.search);
-
-if (query.get("frame") === "phone") {
-  document.documentElement.classList.add("qa-phone-frame");
-}
-
-const controls = {
-  clockStyle: document.getElementById("clockStyle"),
-  clockColor: document.getElementById("clockColor"),
-  clockSize: document.getElementById("clockSize"),
-  clockWeight: document.getElementById("clockWeight"),
-  clockPosition: document.getElementById("clockPosition"),
-  clockOpacity: document.getElementById("clockOpacity"),
-  wallpaperZoom: document.getElementById("wallpaperZoom"),
-  wallpaperX: document.getElementById("wallpaperX"),
-  wallpaperY: document.getElementById("wallpaperY"),
-  showDate: document.getElementById("showDate"),
-  showLock: document.getElementById("showLock"),
-  showControls: document.getElementById("showControls"),
-  use24Hour: document.getElementById("use24Hour"),
-  rewindDelay: document.getElementById("rewindDelay"),
-  rewindSpeed: document.getElementById("rewindSpeed"),
-};
-
-const outputs = {
-  clockSize: document.getElementById("clockSizeValue"),
-  clockWeight: document.getElementById("clockWeightValue"),
-  clockPosition: document.getElementById("clockPositionValue"),
-  clockOpacity: document.getElementById("clockOpacityValue"),
-  wallpaperZoom: document.getElementById("wallpaperZoomValue"),
-  rewindDelay: document.getElementById("rewindDelayValue"),
-  rewindSpeed: document.getElementById("rewindSpeedValue"),
-};
-
-let settings = loadSettings();
-let wallpaperBlob = null;
-let wallpaperURL = null;
-let referenceBlob = null;
-let referenceURL = null;
-let referenceVisible = false;
-let toastTimer = null;
-let previewTimer = null;
+const $ = (id) => document.getElementById(id);
+const stage = $("stage");
+const lockView = $("lockView");
+const setup = $("setupScreen");
+let settings;
+try { settings = normalizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(LEGACY_KEY) || "{}"), innerWidth / innerHeight); }
+catch { settings = normalizeSettings(); }
+let mode = "setup";
+let selectedPart = "clock";
+let ready = false;
+let total = 0;
+let tapCount = 0;
+let drag = null;
 let wakeLock = null;
-let wakeLockWanted = false;
-let performanceMode = "setup";
-let practiceMode = false;
-let inputTotal = 0;
-let inputTapCount = 0;
-let activePointer = null;
-let cancelHoldTimer = null;
-let rewindStartTimer = null;
-let rewindTimer = null;
-let liveSyncTimer = null;
-let cursorMinute = null;
-let resetCornerTaps = [];
-let twoFingerSwipe = null;
-
-function loadSettings() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
-    return { ...DEFAULT_SETTINGS, ...saved };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
-}
+let wantWakeLock = false;
+let toastTimer;
+let saveTimer;
+let calcHoldTimer;
+let calcHoldTriggered = false;
+let calcPointer = null;
+let roundSource = "taps";
+let roundCovered = true;
+let lastPhase = "setup";
+let referenceOpacity = 50;
+const pointers = new Map();
+let swipe = null;
+let multiTouch = false;
+const assets = { wallpaper: null, reference: null, cover: null };
+const uploadGeneration = { wallpaper: 0, reference: 0, cover: 0 };
+const mediaWrites = {};
+const calculator = new Calculator();
+const round = new Round({ change: renderRound });
 
 function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+    catch { showToast("Settings could not be saved on this device."); }
+  }, 120);
 }
-
-function openMediaDatabase() {
-  return new Promise((resolve, reject) => {
-    if (!("indexedDB" in window)) {
-      reject(new Error("IndexedDB is unavailable"));
-      return;
-    }
-
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+function showToast(message) {
+  clearTimeout(toastTimer);
+  $("toast").textContent = message;
+  $("toast").hidden = false;
+  toastTimer = setTimeout(() => { $("toast").hidden = true; }, 2600);
+}
+function showError(message) {
+  $("setupError").textContent = message;
+  $("setupError").hidden = !message;
+}
+function tab(name) {
+  document.querySelectorAll("[data-tab]").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.tab === name)));
+  document.querySelectorAll("[data-panel]").forEach(el => { el.hidden = el.dataset.panel !== name; });
+  document.querySelector(".settings-content").scrollTop = 0;
+}
+function syncSettings() {
+  document.querySelectorAll("[data-setting]").forEach(el => {
+    const value = settings[el.dataset.setting];
+    if (el.type === "checkbox") el.checked = value;
+    else el.value = String(value);
   });
-}
-
-async function readMedia(key) {
-  const database = await openMediaDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(key);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-  });
-}
-
-async function writeMedia(key, value) {
-  const database = await openMediaDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(value, key);
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
-
-async function clearMedia() {
-  const database = await openMediaDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).clear();
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
-
-function replaceObjectURL(oldURL, blob) {
-  if (oldURL) URL.revokeObjectURL(oldURL);
-  return blob ? URL.createObjectURL(blob) : null;
-}
-
-function setWallpaper(blob) {
-  wallpaperBlob = blob;
-  wallpaperURL = replaceObjectURL(wallpaperURL, blob);
-  for (const layer of wallpaperLayers) {
-    layer.style.backgroundImage = wallpaperURL ? `url("${wallpaperURL}")` : "";
+  // Keep a previously saved custom pace available instead of silently changing it.
+  const pace = $("rewindSpeed");
+  if (!pace.value) {
+    pace.add(new Option(settings.rewindSpeed + " ms", settings.rewindSpeed));
+    pace.value = settings.rewindSpeed;
   }
-  wallpaperLabel.textContent = blob ? "Wallpaper saved" : "Choose wallpaper";
-  readyPill.classList.toggle("is-ready", Boolean(blob));
-  readyPill.lastChild.textContent = blob ? " Ready" : " Demo ready";
-  armStatus.textContent = blob ? "Personal wallpaper ready" : "Demo wallpaper active";
+  syncInput();
+  syncZones();
+  syncEditor();
 }
-
-function setReference(blob) {
-  referenceBlob = blob;
-  referenceURL = replaceObjectURL(referenceURL, blob);
-  if (referenceURL) referenceLayer.src = referenceURL;
-  else referenceLayer.removeAttribute("src");
-  referenceLabel.textContent = blob ? "Reference saved" : "Add reference";
-  toggleReferenceButton.disabled = !blob;
-  if (!blob) setReferenceVisible(false);
+function syncInput() {
+  const method = settings.inputMethod;
+  $("calculatorOption").hidden = !settings.calculatorEnabled;
+  $("calculatorOption").disabled = !settings.calculatorEnabled;
+  $("inputMethod").value = method;
+  $("numberRow").hidden = method !== "number";
+  $("editZones").hidden = method !== "taps";
+  $("autoConfirmRow").hidden = method !== "taps";
+  $("coverImageRow").hidden = !settings.useCover;
+  $("shortcutHelp").hidden = method !== "shortcut";
+  if (method !== "clipboard") $("pasteFallback").hidden = true;
+  $("dateFormat").disabled = !settings.showDate;
+  const cover = settings.useCover;
+  const messages = {
+    taps: cover ? "Enter minutes using your invisible zones, then confirm to wake the clock." : "Enter minutes on the visible tap map, then confirm to reveal.",
+    clipboard: cover ? "Start, run your Shortcut, then return and tap the cover. The app reads the clipboard, validates the number, then fades in the clock. iOS may ask you to tap Paste." : "Run your Shortcut first. Paste & perform reads and validates the clipboard before showing the clock. iOS may ask you to tap Paste.",
+    shortcut: cover ? "The link loads the minutes and opens the cover. Tap once to reveal." : "The link loads the minutes, then reveals immediately.",
+    number: cover ? "Load the minutes, then tap the cover to reveal." : "The clock appears as soon as you start.",
+    calculator: "Enter their number as part of a calculation. Hold = for 0.7 seconds to use the last number entered." + (cover ? " Tap the cover to reveal." : " The clock then appears."),
+  };
+  $("inputHelp").textContent = messages[method];
+  $("performButton").textContent = method === "clipboard" && !cover ? "Paste & perform" : method === "calculator" ? "Open calculator" : method === "shortcut" ? "Open using your Shortcut" : "Start performance";
+  $("performButton").disabled = !ready || method === "shortcut" || round.phase === "reading";
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "minutes=NUMBER";
+  $("shortcutURL").value = url.href;
 }
-
-function setReferenceVisible(visible) {
-  referenceVisible = Boolean(visible && referenceBlob);
-  referenceLayer.classList.toggle("is-visible", referenceVisible);
-  referenceOpacityRow.classList.toggle("is-hidden", !referenceVisible);
-  toggleReferenceButton.textContent = referenceVisible ? "Hide reference" : "Show reference";
-}
-
-function valueFromControl(key, element) {
-  if (element.type === "checkbox") return element.checked;
-  if (element.type === "range") return Number(element.value);
-  return element.value;
-}
-
-function syncControlsFromSettings() {
-  for (const [key, element] of Object.entries(controls)) {
-    if (element.type === "checkbox") element.checked = Boolean(settings[key]);
-    else element.value = String(settings[key]);
+function syncEditor() {
+  const isText = selectedPart !== "wallpaper";
+  $("textControls").hidden = !isText;
+  $("imageControls").hidden = isText;
+  document.querySelectorAll("[data-part-tab]").forEach(el => el.setAttribute("aria-pressed", String(el.dataset.partTab === selectedPart)));
+  document.querySelectorAll(".lock-text").forEach(el => el.classList.toggle("selected", el.dataset.part === selectedPart));
+  if (isText) {
+    const part = settings[selectedPart];
+    $("textSize").min = selectedPart === "clock" ? 8 : 2;
+    $("textSize").max = selectedPart === "clock" ? 34 : 12;
+    for (const [id, key] of [["textSize","size"],["textWeight","weight"],["textOpacity","opacity"],["textStyle","style"],["textColor","color"]]) $(id).value = part[key];
+    $("sizeValue").textContent = String(Number(part.size.toFixed(1)));
+    $("weightValue").textContent = part.weight;
+    $("opacityValue").textContent = part.opacity + "%";
   }
+  $("zoomValue").textContent = settings.wallpaperZoom + "%";
+  $("referenceRow").hidden = !assets.reference;
+  $("referenceLayer").hidden = mode !== "edit" || !assets.reference || referenceOpacity === 0;
+  $("referenceLayer").style.opacity = referenceOpacity / 100;
 }
-
+function selectPart(part) {
+  selectedPart = part;
+  if (part === "date" && !settings.showDate) {
+    settings.showDate = true;
+    $("showDate").checked = true;
+    saveSettings();
+  }
+  syncEditor();
+  applyAppearance();
+}
 function applyAppearance() {
   const root = document.documentElement.style;
-  root.setProperty("--clock-size", String(settings.clockSize));
-  root.setProperty("--clock-color", settings.clockColor);
-  root.setProperty("--clock-weight", String(settings.clockWeight));
-  root.setProperty("--clock-y", `${settings.clockPosition}%`);
-  root.setProperty("--clock-opacity", String(settings.clockOpacity / 100));
-  root.setProperty("--wallpaper-zoom", String(settings.wallpaperZoom / 100));
-  root.setProperty("--wallpaper-x", `${settings.wallpaperX}%`);
-  root.setProperty("--wallpaper-y", `${settings.wallpaperY}%`);
-
-  for (const view of lockViews) {
-    view.classList.toggle("clock-rounded", settings.clockStyle === "rounded");
-    view.classList.toggle("clock-glass", settings.clockStyle === "glass");
-    view.classList.toggle("hide-date", !settings.showDate);
-    view.classList.toggle("hide-lock", !settings.showLock);
-    view.classList.toggle("hide-controls", !settings.showControls);
+  root.setProperty("--wallpaper-zoom", settings.wallpaperZoom / 100);
+  root.setProperty("--wallpaper-x", settings.wallpaperX + "%");
+  root.setProperty("--wallpaper-y", settings.wallpaperY + "%");
+  for (const part of ["clock","date"]) {
+    const s = settings[part];
+    const el = $(part + "Text");
+    root.setProperty("--" + part + "-size", s.size);
+    Object.assign(el.style, { left: s.x + "%", top: s.y + "%", fontWeight: s.weight, color: s.color, opacity: s.opacity, fontSize: "" });
+    el.dataset.style = s.style;
   }
-
-  outputs.clockSize.textContent = Number(settings.clockSize).toFixed(1).replace(".0", "");
-  outputs.clockWeight.textContent = String(settings.clockWeight);
-  outputs.clockPosition.textContent = `${settings.clockPosition}%`;
-  outputs.clockOpacity.textContent = `${settings.clockOpacity}%`;
-  outputs.wallpaperZoom.textContent = `${settings.wallpaperZoom}%`;
-  outputs.rewindDelay.textContent = `${Number(settings.rewindDelay).toFixed(1)}s`;
-  outputs.rewindSpeed.textContent = `${settings.rewindSpeed}ms`;
-
-  const approximateDuration = settings.rewindDelay + (10 * settings.rewindSpeed) / 1000;
-  document.getElementById("timingSummary").textContent =
-    `A 10-minute choice takes about ${approximateDuration.toFixed(1)} seconds from wake to landing.`;
+  $("dateText").hidden = !settings.showDate;
+  renderTime(["holding","rewinding","landed"].includes(round.phase) ? round.date() : new Date());
 }
-
-function renderDateAndTime(view, date) {
-  view.querySelector(".lock-time").textContent = formatClock(date, settings.use24Hour);
-  view.querySelector(".lock-date").textContent = formatLockDate(date);
+function renderTime(date) {
+  $("clockText").textContent = formatClock(date, settings.use24Hour);
+  $("dateText").textContent = formatLockDate(date, settings.dateFormat);
+  if (stage.hidden) return;
+  for (const part of ["clock","date"]) {
+    const el = $(part + "Text");
+    if (el.hidden) continue;
+    el.style.fontSize = "";
+    const box = lockView.getBoundingClientRect();
+    if (!box.width) continue;
+    const width = el.scrollWidth;
+    if (width > box.width * .98) el.style.fontSize = settings[part].size * box.width / 100 * box.width * .98 / width + "px";
+    const bounds = el.getBoundingClientRect();
+    const halfX = bounds.width / box.width * 50;
+    const halfY = bounds.height / box.height * 50;
+    el.style.left = clamp(settings[part].x, halfX, 100-halfX) + "%";
+    el.style.top = clamp(settings[part].y, halfY, 100-halfY) + "%";
+  }
 }
-
-function refreshPreviewClock() {
-  renderDateAndTime(previewLockView, new Date());
+function syncZones() {
+  for (const key of ["x","y","confirm"]) $("zoneMap").style.setProperty("--zone-" + key, settings.zones[key] + "%");
+  document.querySelectorAll("[data-zone-value]").forEach(el => {
+    el.value = settings.zones.values[Number(el.dataset.zoneValue)];
+    el.disabled = mode === "performance";
+  });
 }
-
-function showToast(message, duration = 2200) {
-  clearTimeout(toastTimer);
-  toast.textContent = message;
-  toast.classList.add("is-visible");
-  toastTimer = setTimeout(() => toast.classList.remove("is-visible"), duration);
+function setAsset(kind, blob) {
+  if (assets[kind]) URL.revokeObjectURL(assets[kind]);
+  assets[kind] = blob ? URL.createObjectURL(blob) : null;
+  const image = assets[kind] ? 'url("' + assets[kind] + '")' : "";
+  if (kind === "wallpaper") {
+    document.querySelector(".wallpaper-layer").style.backgroundImage = image;
+    document.querySelector(".mini-wallpaper").style.backgroundImage = image;
+  } else if (kind === "cover") {
+    $("coverLayer").style.backgroundImage = image;
+    $("removeCover").hidden = !blob;
+  } else {
+    if (blob) $("referenceLayer").src = assets.reference;
+    else $("referenceLayer").removeAttribute("src");
+    $("removeReference").hidden = !blob;
+  }
+  $(kind + "Label").textContent = blob ? "Replace" : "Choose";
+  syncEditor();
 }
-
-function isStandalone() {
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-}
-
-function vibrate(pattern = 12) {
+async function upload(kind, file) {
+  if (!file) return;
+  const generation = ++uploadGeneration[kind];
   try {
-    navigator.vibrate?.(pattern);
-  } catch {
-    // Vibration is optional and unsupported in iOS Safari.
-  }
+    await validateImage(file);
+    if (generation !== uploadGeneration[kind]) return;
+    setAsset(kind, file);
+    if (kind === "reference") { referenceOpacity = 50; $("referenceOpacity").value = 50; $("referenceValue").textContent = "50%"; syncEditor(); }
+    mediaWrites[kind] = (mediaWrites[kind] || Promise.resolve()).catch(() => {}).then(() => writeMedia(kind, file));
+    await mediaWrites[kind];
+  } catch (error) { showToast(assets[kind] && generation === uploadGeneration[kind] ? error.message + " The current image remains available for this session." : error.message); }
 }
-
+async function removeAsset(kind) {
+  uploadGeneration[kind]++;
+  setAsset(kind, null);
+  try {
+    mediaWrites[kind] = (mediaWrites[kind] || Promise.resolve()).catch(() => {}).then(() => writeMedia(kind, null));
+    await mediaWrites[kind];
+  } catch { showToast("The saved image could not be removed. Try again."); }
+}
+function cleanStage() {
+  stage.classList.remove("editing","entering","waking");
+  for (const id of ["editorUI","zoneEditor","visibleInput","coverLayer","calculator","referenceLayer"]) $(id).hidden = true;
+  lockView.hidden = false;
+}
+function openEditor() {
+  mode = "edit";
+  cleanStage();
+  setup.hidden = true;
+  stage.hidden = false;
+  stage.classList.add("editing");
+  $("editorUI").hidden = false;
+  applyAppearance();
+  syncEditor();
+}
+function openZones() {
+  mode = "zones";
+  cleanStage();
+  setup.hidden = true;
+  stage.hidden = false;
+  lockView.hidden = true;
+  $("coverLayer").hidden = false;
+  $("zoneEditor").hidden = false;
+  syncZones();
+}
+function showSetup() {
+  mode = "setup";
+  round.reset();
+  clearTimeout(calcHoldTimer);
+  calcPointer = null;
+  total = 0; tapCount = 0; drag = null;
+  cleanStage();
+  stage.hidden = true;
+  setup.hidden = false;
+  $("pasteNumber").value = "";
+  $("pasteFallback").hidden = true;
+  showError("");
+  syncSettings();
+  releaseWakeLock();
+}
 async function requestWakeLock() {
-  wakeLockWanted = true;
-  if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  wantWakeLock = true;
+  if (!navigator.wakeLock || document.visibilityState !== "visible" || wakeLock) return;
   try {
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLock.addEventListener("release", () => {
-      wakeLock = null;
-    });
-  } catch {
-    wakeLock = null;
-  }
+    const lock = await navigator.wakeLock.request("screen");
+    if (!wantWakeLock) { await lock.release(); return; }
+    wakeLock = lock;
+    lock.addEventListener("release", () => { if (wakeLock === lock) wakeLock = null; });
+  } catch { /* Wake lock is optional. */ }
 }
-
-async function releaseWakeLock() {
-  wakeLockWanted = false;
-  try {
-    await wakeLock?.release();
-  } catch {
-    // A released lock needs no further handling.
-  }
+function releaseWakeLock() {
+  wantWakeLock = false;
+  wakeLock?.release().catch(() => {});
   wakeLock = null;
 }
-
-async function askForImmersiveMode() {
-  try {
-    if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
-      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-    }
-  } catch {
-    // Installed iPhone web apps already use their standalone presentation.
-  }
-  try {
-    await screen.orientation?.lock?.("portrait");
-  } catch {
-    // Orientation is already declared in the manifest.
-  }
-}
-
-function clearPerformanceTimers() {
-  clearTimeout(rewindStartTimer);
-  clearTimeout(rewindTimer);
-  clearInterval(liveSyncTimer);
-  rewindStartTimer = null;
-  rewindTimer = null;
-  liveSyncTimer = null;
-}
-
-function resetSecretInput() {
-  inputTotal = 0;
-  inputTapCount = 0;
-  activePointer = null;
-  clearTimeout(cancelHoldTimer);
-  cancelHoldTimer = null;
-}
-
-function showSetup() {
-  clearPerformanceTimers();
-  resetSecretInput();
-  performanceMode = "setup";
-  practiceMode = false;
-  cursorMinute = null;
-  resetCornerTaps = [];
-  armedScreen.classList.remove("is-active");
-  lockScreen.classList.remove("is-active", "is-waking");
-  setupScreen.classList.remove("is-hidden");
-  document.body.classList.remove("performance-active");
-  releaseWakeLock();
-  try {
-    if (document.fullscreenElement) document.exitFullscreen();
-  } catch {
-    // Exiting full screen is best effort.
-  }
-}
-
-function arm({ practice = false } = {}) {
-  clearPerformanceTimers();
-  resetSecretInput();
-  performanceMode = "armed";
-  practiceMode = practice;
-  setupScreen.classList.add("is-hidden");
-  lockScreen.classList.remove("is-active", "is-waking");
-  armedScreen.classList.add("is-active");
-  document.body.classList.add("performance-active");
+function prepareRound(source, choice = null) {
+  showError("");
+  $("toast").hidden = true;
+  cleanStage();
+  total = 0; tapCount = 0;
+  $("tapTotal").textContent = "0";
+  roundSource = source;
+  roundCovered = settings.useCover;
+  mode = "performance";
+  round.arm(settings, choice);
   requestWakeLock();
-  askForImmersiveMode();
 }
-
-function signalInvalidInput() {
-  inputTotal = 0;
-  inputTapCount = 0;
-  vibrate([18, 45, 18]);
-  assistDot.classList.remove("is-error");
-  void assistDot.offsetWidth;
-  assistDot.classList.add("is-error");
-}
-
-function confirmSecretInput() {
-  const choice = inputTotal === 0 ? 5 : inputTotal;
-  if (!isValidChoice(choice)) {
-    signalInvalidInput();
-    return;
+function renderRound() {
+  if (!round) return;
+  if (mode !== "performance") { lastPhase = round.phase; return; }
+  const revealed = ["holding","rewinding","landed"].includes(round.phase);
+  const visibleMap = !roundCovered && roundSource === "taps" && !revealed;
+  const onStage = revealed || roundCovered || visibleMap;
+  stage.hidden = !onStage;
+  setup.hidden = onStage;
+  lockView.hidden = !revealed;
+  $("coverLayer").hidden = revealed || !roundCovered;
+  $("zoneEditor").hidden = !visibleMap;
+  $("visibleInput").hidden = !visibleMap;
+  stage.classList.toggle("entering", visibleMap);
+  if (visibleMap) syncZones();
+  if (revealed) {
+    $("calculator").hidden = true;
+    applyAppearance();
+    if (round.phase === "holding" && lastPhase !== "holding") {
+      stage.classList.remove("waking");
+      void stage.offsetWidth;
+      stage.classList.add("waking");
+    }
   }
-
-  vibrate(18);
-  if (practiceMode) {
+  lastPhase = round.phase;
+  syncInput();
+}
+function startPerformance() {
+  if (!ready) return;
+  if (settings.inputMethod === "calculator") {
+    prepareRound("calculator");
+    mode = "calculator";
+    cleanStage();
+    setup.hidden = true;
+    stage.hidden = false;
+    lockView.hidden = true;
+    $("calculator").hidden = false;
+    calculator.clear();
+    renderCalculator();
+  } else if (settings.inputMethod === "number") {
+    const number = parseMinutes($("chosenNumber").value);
+    if (number === null) { tab("input"); showError("Enter a whole number from 1 to 180."); return; }
+    prepareRound("number", number);
+    if (!roundCovered) round.reveal();
+  } else if (settings.inputMethod === "clipboard") {
+    prepareRound("clipboard");
+    if (!roundCovered) readClipboard();
+  } else if (settings.inputMethod === "taps") prepareRound("taps");
+}
+async function readClipboard() {
+  if (round.phase !== "armed" || roundSource !== "clipboard") return;
+  try {
+    await round.readClipboard(() => {
+      if (!navigator.clipboard?.readText) throw new Error("Clipboard access is unavailable here.");
+      return navigator.clipboard.readText();
+    });
+  } catch (error) {
     showSetup();
-    showToast(`Input read as ${choice}.`, 2600);
-    return;
+    tab("input");
+    $("pasteFallback").hidden = false;
+    showError(error.message.includes("whole number") ? error.message : "Clipboard access was not allowed. Try again, or paste the number below. Pasting a valid number starts the reveal.");
   }
-  beginReveal(choice);
 }
-
-function handleSecretTap(x, y) {
-  if (performanceMode !== "armed") return;
-  const zone = getInputZone(x, y, window.innerWidth, window.innerHeight);
-
+function handlePerformanceTap(x, y) {
+  if (round.phase !== "armed") return;
+  if (round.choice !== null) { round.reveal(); return; }
+  if (roundSource === "clipboard") { readClipboard(); return; }
+  if (roundSource !== "taps") return;
+  const bounds = stage.getBoundingClientRect();
+  const zone = getInputZone(x-bounds.left,y-bounds.top,bounds.width,bounds.height,settings.zones);
   if (zone.kind === "confirm") {
-    confirmSecretInput();
+    if (isValidChoice(total)) round.reveal(total);
     return;
   }
+  total += zone.value;
+  tapCount++;
+  if (total > 180) { total = 0; tapCount = 0; }
+  $("tapTotal").textContent = total;
+  if (settings.autoConfirm > 0 && tapCount >= settings.autoConfirm && isValidChoice(total)) round.reveal(total);
+}
+function renderCalculator() {
+  $("calculatorDisplay").textContent = calculator.display;
+  $("calculatorDisplay").classList.toggle("small", calculator.display.length > 7);
+}
+function useCalculatorNumber() {
+  if (mode !== "calculator") return;
+  calcHoldTriggered = true;
+  if (!isValidChoice(calculator.lastEntered)) {
+    showSetup(); tab("input"); showError("The last calculator number must be a whole number from 1 to 180."); return;
+  }
+  const value = calculator.lastEntered;
+  prepareRound("calculator", value);
+  if (!roundCovered) round.reveal();
+}
+function consumeShortcut() {
+  const url = new URL(location.href);
+  const hash = new URLSearchParams(url.hash.slice(1));
+  if (!url.searchParams.has("minutes") && !hash.has("minutes")) return undefined;
+  const values = [...url.searchParams.getAll("minutes"), ...hash.getAll("minutes")];
+  const choice = values.length === 1 ? parseMinutes(values[0]) : null;
+  url.searchParams.delete("minutes");
+  hash.delete("minutes");
+  url.hash = hash.toString();
+  history.replaceState(null, "", url);
+  return choice;
+}
+function acceptShortcut(choice) {
+  if (choice === undefined) return;
+  if (["holding","rewinding","landed"].includes(round.phase)) return;
+  if (choice === null) { showSetup(); tab("input"); showError("Shortcut minutes must be a whole number from 1 to 180."); return; }
+  prepareRound("shortcut", choice);
+  if (!roundCovered) round.reveal();
+}
 
-  inputTotal += zone.value;
-  inputTapCount += 1;
-  vibrate(8);
-
-  if (inputTotal > 15) {
-    signalInvalidInput();
+// Pointer tracking shares a cancellation path across dragging, secret taps, and the exit gesture.
+stage.addEventListener("pointerdown", event => {
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY });
+  if (pointers.size >= 2) {
+    multiTouch = true;
+    const points = [...pointers.values()].slice(0,2);
+    swipe = { x: (points[0].x+points[1].x)/2, y: (points[0].y+points[1].y)/2 };
+    drag = null;
+    clearTimeout(calcHoldTimer);
+    calcPointer = null;
     return;
   }
-
-  if (inputTapCount >= 3) {
-    if (isValidChoice(inputTotal)) confirmSecretInput();
-    else signalInvalidInput();
-  }
-}
-
-function renderPerformanceMinute(stamp) {
-  renderDateAndTime(performanceLockView, dateFromMinute(stamp));
-}
-
-function beginLiveSync() {
-  clearInterval(liveSyncTimer);
-  liveSyncTimer = setInterval(() => {
-    if (performanceMode !== "landed") return;
-    renderPerformanceMinute(minuteStamp());
-  }, 1000);
-}
-
-function finishRewind(liveMinute = minuteStamp()) {
-  cursorMinute = liveMinute;
-  renderPerformanceMinute(liveMinute);
-  performanceMode = "landed";
-  beginLiveSync();
-}
-
-function rewindTick() {
-  if (performanceMode !== "rewinding" || cursorMinute === null) return;
-  const liveMinute = minuteStamp();
-  const nextMinute = nextRewindMinute(cursorMinute, liveMinute);
-
-  if (nextMinute >= cursorMinute || nextMinute <= liveMinute) {
-    finishRewind(liveMinute);
-    return;
-  }
-
-  cursorMinute = nextMinute;
-  renderPerformanceMinute(cursorMinute);
-  rewindTimer = setTimeout(rewindTick, settings.rewindSpeed);
-}
-
-function beginReveal(choice) {
-  resetSecretInput();
-  cursorMinute = fakeMinuteFromNow(choice);
-  renderPerformanceMinute(cursorMinute);
-  armedScreen.classList.remove("is-active");
-  lockScreen.classList.add("is-active", "is-waking");
-  performanceMode = "holding";
-
-  rewindStartTimer = setTimeout(() => {
-    if (performanceMode !== "holding") return;
-    performanceMode = "rewinding";
-    rewindTick();
-  }, settings.rewindDelay * 1000);
-
-  setTimeout(() => lockScreen.classList.remove("is-waking"), 340);
-}
-
-function onArmedPointerDown(event) {
-  if (performanceMode !== "armed" || activePointer) return;
-  event.preventDefault();
-  activePointer = {
-    id: event.pointerId,
-    x: event.clientX,
-    y: event.clientY,
-    cancelled: false,
-  };
-  armedScreen.setPointerCapture?.(event.pointerId);
-
-  if (event.clientX < 74 && event.clientY < 116) {
-    cancelHoldTimer = setTimeout(() => {
-      if (!activePointer || activePointer.id !== event.pointerId) return;
-      activePointer.cancelled = true;
-      vibrate(20);
-      showSetup();
-      showToast("Performance disarmed.");
-    }, 1250);
-  }
-}
-
-function onArmedPointerUp(event) {
-  if (!activePointer || activePointer.id !== event.pointerId) return;
-  event.preventDefault();
-  clearTimeout(cancelHoldTimer);
-  const wasCancelled = activePointer.cancelled;
-  activePointer = null;
-  cancelHoldTimer = null;
-  if (!wasCancelled && performanceMode === "armed") {
-    handleSecretTap(event.clientX, event.clientY);
-  }
-}
-
-function onArmedPointerCancel(event) {
-  if (!activePointer || activePointer.id !== event.pointerId) return;
-  clearTimeout(cancelHoldTimer);
-  activePointer = null;
-  cancelHoldTimer = null;
-}
-
-function onLockScreenPointerUp(event) {
-  if (event.clientX >= 76 || event.clientY >= 126) return;
-  const now = Date.now();
-  resetCornerTaps = [...resetCornerTaps.filter((time) => now - time < 850), now];
-  if (resetCornerTaps.length >= 3) {
-    vibrate(20);
-    showSetup();
-    showToast("Ready for another performance.");
-  }
-}
-
-function averageTouchPoint(touches) {
-  const points = [...touches].slice(0, 2);
-  return {
-    x: points.reduce((total, touch) => total + touch.clientX, 0) / points.length,
-    y: points.reduce((total, touch) => total + touch.clientY, 0) / points.length,
-  };
-}
-
-function onPerformanceTouchStart(event) {
-  if (performanceMode === "setup" || event.touches.length !== 2) return;
-  event.preventDefault();
-  clearTimeout(cancelHoldTimer);
-  if (activePointer) activePointer.cancelled = true;
-  twoFingerSwipe = {
-    ...averageTouchPoint(event.touches),
-    triggered: false,
-  };
-}
-
-function onPerformanceTouchMove(event) {
-  if (!twoFingerSwipe || twoFingerSwipe.triggered || event.touches.length < 2) return;
-  const point = averageTouchPoint(event.touches);
-  const deltaX = point.x - twoFingerSwipe.x;
-  const deltaY = point.y - twoFingerSwipe.y;
-
-  if (deltaY > 90 && Math.abs(deltaX) < 100) {
+  if (mode === "performance" && !event.target.closest("button")) event.preventDefault();
+  if (event.target.closest("#editorUI, #zoneEditor input, #zoneEditor header")) return;
+  const partElement = event.target.closest("[data-part]");
+  const divider = event.target.closest("[data-divider]");
+  if (mode === "edit" && (partElement || selectedPart === "wallpaper")) {
+    if (partElement && selectedPart !== "wallpaper") selectPart(partElement.dataset.part);
+    const bounds = stage.getBoundingClientRect();
+    const part = selectedPart;
+    const p = part === "wallpaper" ? { x: settings.wallpaperX, y: settings.wallpaperY } : settings[part];
+    drag = { id: event.pointerId, part, startX: event.clientX, startY: event.clientY, x: p.x, y: p.y, bounds };
+    event.target.setPointerCapture?.(event.pointerId);
+  } else if (mode === "zones" && divider) {
+    drag = { id: event.pointerId, divider: divider.dataset.divider, bounds: stage.getBoundingClientRect() };
+    divider.setPointerCapture(event.pointerId);
+  } else if (mode === "preview") {
+    // A tap returns to the editor without adding a visible preview-only control.
     event.preventDefault();
-    twoFingerSwipe.triggered = true;
-    vibrate(20);
-    showSetup();
-    showToast("Ready for setup.");
   }
-}
-
-function onPerformanceTouchEnd() {
-  if (!twoFingerSwipe) return;
-  twoFingerSwipe = null;
-}
-
-async function acceptMediaFile(kind, file) {
-  if (!file?.type.startsWith("image/")) {
-    showToast("Choose an image file.");
+});
+stage.addEventListener("pointermove", event => {
+  const pointer = pointers.get(event.pointerId);
+  if (pointer) Object.assign(pointer, { x: event.clientX, y: event.clientY });
+  if (multiTouch && pointers.size >= 2 && swipe) {
+    const points = [...pointers.values()].slice(0,2);
+    const dx = (points[0].x+points[1].x)/2-swipe.x;
+    const dy = (points[0].y+points[1].y)/2-swipe.y;
+    if (dy > 90 && Math.abs(dx) < 100) { swipe = null; showSetup(); }
     return;
   }
-  if (file.size > 25 * 1024 * 1024) {
-    showToast("That image is larger than 25 MB.");
-    return;
+  if (!drag || drag.id !== event.pointerId || multiTouch) return;
+  event.preventDefault();
+  const b = drag.bounds;
+  if (drag.divider) {
+    if (drag.divider === "x") settings.zones.x = clamp((event.clientX-b.left)/b.width*100,20,80);
+    if (drag.divider === "y") settings.zones.y = clamp((event.clientY-b.top)/b.height*100,18,settings.zones.confirm-15);
+    if (drag.divider === "confirm") settings.zones.confirm = clamp((event.clientY-b.top)/b.height*100,settings.zones.y+15,85);
+    syncZones();
+  } else {
+    const dx = (event.clientX-drag.startX)/b.width*100;
+    const dy = (event.clientY-drag.startY)/b.height*100;
+    if (drag.part === "wallpaper") {
+      settings.wallpaperX = clamp(drag.x-dx,0,100);
+      settings.wallpaperY = clamp(drag.y-dy,0,100);
+    } else {
+      const el = $(drag.part+"Text");
+      const box = el.getBoundingClientRect();
+      settings[drag.part].x = clamp(drag.x+dx,box.width/b.width*50,100-box.width/b.width*50);
+      settings[drag.part].y = clamp(drag.y+dy,box.height/b.height*50,100-box.height/b.height*50);
+    }
+    applyAppearance();
   }
-
-  try {
-    await writeMedia(kind, file);
-    if (kind === "wallpaper") setWallpaper(file);
-    else setReference(file);
-    showToast(kind === "wallpaper" ? "Wallpaper saved on this device." : "Reference screenshot saved.");
-  } catch {
-    showToast("This browser could not save the image. It will work until the page closes.");
-    if (kind === "wallpaper") setWallpaper(file);
-    else setReference(file);
+});
+function finishPointer(event, cancelled = false) {
+  const p = pointers.get(event.pointerId);
+  const wasDrag = drag?.id === event.pointerId;
+  if (wasDrag) { drag = null; saveSettings(); }
+  if (!cancelled && p && !multiTouch && !wasDrag && Math.hypot(event.clientX-p.startX,event.clientY-p.startY) < 16) {
+    if (mode === "preview") openEditor();
+    else if (mode === "performance" && !event.target.closest("button")) handlePerformanceTap(event.clientX,event.clientY);
   }
+  pointers.delete(event.pointerId);
+  if (!pointers.size) { multiTouch = false; swipe = null; }
 }
+stage.addEventListener("pointerup", event => finishPointer(event));
+stage.addEventListener("pointercancel", event => finishPointer(event,true));
+stage.addEventListener("contextmenu", event => { if (mode !== "zones") event.preventDefault(); });
+stage.addEventListener("animationend", () => stage.classList.remove("waking"));
 
-function resetAppearance() {
-  settings = {
-    ...settings,
-    clockStyle: DEFAULT_SETTINGS.clockStyle,
-    clockColor: DEFAULT_SETTINGS.clockColor,
-    clockSize: DEFAULT_SETTINGS.clockSize,
-    clockWeight: DEFAULT_SETTINGS.clockWeight,
-    clockPosition: DEFAULT_SETTINGS.clockPosition,
-    clockOpacity: DEFAULT_SETTINGS.clockOpacity,
-    wallpaperZoom: DEFAULT_SETTINGS.wallpaperZoom,
-    wallpaperX: DEFAULT_SETTINGS.wallpaperX,
-    wallpaperY: DEFAULT_SETTINGS.wallpaperY,
-    showDate: DEFAULT_SETTINGS.showDate,
-    showLock: DEFAULT_SETTINGS.showLock,
-    showControls: DEFAULT_SETTINGS.showControls,
-    use24Hour: DEFAULT_SETTINGS.use24Hour,
-  };
-  syncControlsFromSettings();
-  applyAppearance();
-  refreshPreviewClock();
-  saveSettings();
-  showToast("Appearance reset.");
+document.querySelectorAll("[data-tab]").forEach(el => el.addEventListener("click", () => tab(el.dataset.tab)));
+document.querySelectorAll("[data-part-tab]").forEach(el => el.addEventListener("click", () => selectPart(el.dataset.partTab)));
+document.querySelectorAll("[data-setting]").forEach(el => el.addEventListener("input", () => {
+  const key = el.dataset.setting;
+  if (el.type === "number" && (!el.value || !el.validity.valid)) return;
+  settings[key] = el.type === "checkbox" ? el.checked : ["number","range"].includes(el.type) || ["rewindSpeed","autoConfirm"].includes(key) ? Number(el.value) : el.value;
+  if (!settings.calculatorEnabled && settings.inputMethod === "calculator") settings.inputMethod = "taps";
+  showError("");
+  syncInput(); syncEditor(); applyAppearance(); saveSettings();
+}));
+document.querySelectorAll("[data-setting][type=number]").forEach(el => el.addEventListener("change", () => { if (!el.value || !el.validity.valid) el.value = settings[el.dataset.setting]; }));
+for (const [id,key] of [["textSize","size"],["textWeight","weight"],["textOpacity","opacity"],["textStyle","style"],["textColor","color"]]) {
+  $(id).addEventListener("input", () => {
+    if (selectedPart === "wallpaper") return;
+    settings[selectedPart][key] = $(id).type === "range" ? Number($(id).value) : $(id).value;
+    syncEditor(); applyAppearance(); saveSettings();
+  });
 }
-
-async function clearEverything() {
-  try {
-    await clearMedia();
-  } catch {
-    // Settings are still cleared if media storage is unavailable.
+document.querySelectorAll("[data-zone-value]").forEach(el => el.addEventListener("change", () => {
+  const value = parseMinutes(el.value);
+  if (value !== null) settings.zones.values[Number(el.dataset.zoneValue)] = value;
+  syncZones(); saveSettings();
+}));
+for (const kind of ["wallpaper","reference","cover"]) {
+  $(kind+"Input").addEventListener("change", () => {
+    upload(kind, $(kind+"Input").files[0]);
+    $(kind+"Input").value = "";
+  });
+}
+$("removeCover").addEventListener("click", () => removeAsset("cover"));
+$("removeReference").addEventListener("click", () => removeAsset("reference"));
+$("referenceOpacity").addEventListener("input", () => {
+  referenceOpacity = Number($("referenceOpacity").value);
+  $("referenceValue").textContent = referenceOpacity + "%";
+  syncEditor();
+});
+$("editClock").addEventListener("click", openEditor);
+$("editZones").addEventListener("click", openZones);
+$("editorDone").addEventListener("click", showSetup);
+$("zonesDone").addEventListener("click", () => { showSetup(); tab("input"); });
+$("entryBack").addEventListener("click", showSetup);
+$("editorPreview").addEventListener("click", () => {
+  mode = "preview";
+  cleanStage();
+  renderTime(new Date());
+});
+$("movePanel").addEventListener("click", () => {
+  const top = $("editorPanel").classList.toggle("at-top");
+  $("movePanel").setAttribute("aria-label", top ? "Move controls to bottom" : "Move controls to top");
+  $("movePanel").title = $("movePanel").getAttribute("aria-label");
+});
+$("performButton").addEventListener("click", startPerformance);
+$("shortcutURL").addEventListener("click", () => $("shortcutURL").select());
+$("pasteNumber").addEventListener("paste", event => {
+  if (settings.inputMethod !== "clipboard") return;
+  event.preventDefault();
+  const number = parseMinutes(event.clipboardData.getData("text/plain"));
+  if (number === null) { showError("Paste only a whole number from 1 to 180."); return; }
+  $("pasteNumber").blur();
+  prepareRound("clipboard", number);
+  if (!roundCovered) round.reveal();
+});
+document.querySelectorAll("[data-calc]").forEach(el => el.addEventListener("click", () => {
+  if (mode !== "calculator" || (el.dataset.calc === "=" && calcHoldTriggered)) { calcHoldTriggered = false; return; }
+  calculator.press(el.dataset.calc); renderCalculator();
+}));
+$("calculatorEquals").addEventListener("pointerdown", event => {
+  calcHoldTriggered = false;
+  if (event.isPrimary === false) return;
+  calcPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  calcHoldTimer = setTimeout(useCalculatorNumber,700);
+});
+$("calculatorEquals").addEventListener("pointermove", event => {
+  if (calcPointer && Math.hypot(event.clientX-calcPointer.x,event.clientY-calcPointer.y) > 14) clearTimeout(calcHoldTimer);
+});
+for (const type of ["pointerup","pointercancel","pointerleave"]) $("calculatorEquals").addEventListener(type, () => { clearTimeout(calcHoldTimer); calcPointer = null; });
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    if (mode === "preview") openEditor();
+    else showSetup();
   }
-  localStorage.removeItem(SETTINGS_KEY);
-  settings = { ...DEFAULT_SETTINGS };
-  setWallpaper(null);
-  setReference(null);
-  syncControlsFromSettings();
-  applyAppearance();
-  refreshPreviewClock();
-  confirmSheet.classList.remove("is-active");
-  confirmSheet.setAttribute("aria-hidden", "true");
-  showToast("Saved setup cleared.");
-}
-
-function bindControls() {
-  for (const [key, element] of Object.entries(controls)) {
-    element.addEventListener("input", () => {
-      settings[key] = valueFromControl(key, element);
-      applyAppearance();
-      refreshPreviewClock();
-      saveSettings();
-    });
-    element.addEventListener("change", () => {
-      settings[key] = valueFromControl(key, element);
-      applyAppearance();
-      refreshPreviewClock();
-      saveSettings();
-    });
+});
+window.addEventListener("resize", () => { if (!stage.hidden) applyAppearance(); });
+window.addEventListener("hashchange", () => { if (ready) acceptShortcut(consumeShortcut()); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    pointers.clear(); multiTouch = false; swipe = null; drag = null;
+    clearTimeout(calcHoldTimer);
+    if (round.phase === "reading") round.arm(settings);
+  } else {
+    if (wantWakeLock && !wakeLock) requestWakeLock();
+    if (["edit","preview"].includes(mode)) renderTime(new Date());
   }
-
-  wallpaperInput.addEventListener("change", () => {
-    acceptMediaFile("wallpaper", wallpaperInput.files?.[0]);
-    wallpaperInput.value = "";
-  });
-
-  referenceInput.addEventListener("change", () => {
-    acceptMediaFile("reference", referenceInput.files?.[0]);
-    referenceInput.value = "";
-  });
-
-  toggleReferenceButton.addEventListener("click", () => setReferenceVisible(!referenceVisible));
-  document.getElementById("referenceOpacity").addEventListener("input", (event) => {
-    document.documentElement.style.setProperty("--reference-opacity", String(Number(event.target.value) / 100));
-  });
-  document.getElementById("resetAppearanceButton").addEventListener("click", resetAppearance);
-  armButton.addEventListener("click", () => arm());
-  rehearseButton.addEventListener("click", () => arm({ practice: true }));
-
-  document.getElementById("clearAllButton").addEventListener("click", () => {
-    confirmSheet.classList.add("is-active");
-    confirmSheet.setAttribute("aria-hidden", "false");
-  });
-  document.getElementById("cancelClearButton").addEventListener("click", () => {
-    confirmSheet.classList.remove("is-active");
-    confirmSheet.setAttribute("aria-hidden", "true");
-  });
-  document.getElementById("confirmClearButton").addEventListener("click", clearEverything);
-
-  armedScreen.addEventListener("pointerdown", onArmedPointerDown, { passive: false });
-  armedScreen.addEventListener("pointerup", onArmedPointerUp, { passive: false });
-  armedScreen.addEventListener("pointercancel", onArmedPointerCancel);
-  armedScreen.addEventListener("touchstart", onPerformanceTouchStart, { passive: false });
-  armedScreen.addEventListener("touchmove", onPerformanceTouchMove, { passive: false });
-  armedScreen.addEventListener("touchend", onPerformanceTouchEnd);
-  armedScreen.addEventListener("touchcancel", onPerformanceTouchEnd);
-  armedScreen.addEventListener("contextmenu", (event) => event.preventDefault());
-  lockScreen.addEventListener("pointerup", onLockScreenPointerUp);
-  lockScreen.addEventListener("touchstart", onPerformanceTouchStart, { passive: false });
-  lockScreen.addEventListener("touchmove", onPerformanceTouchMove, { passive: false });
-  lockScreen.addEventListener("touchend", onPerformanceTouchEnd);
-  lockScreen.addEventListener("touchcancel", onPerformanceTouchEnd);
-  lockScreen.addEventListener("contextmenu", (event) => event.preventDefault());
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && wakeLockWanted && !wakeLock) requestWakeLock();
-  });
-}
-
-async function loadSavedMedia() {
-  try {
-    const [savedWallpaper, savedReference] = await Promise.all([
-      readMedia("wallpaper"),
-      readMedia("reference"),
-    ]);
-    setWallpaper(savedWallpaper);
-    setReference(savedReference);
-  } catch {
-    setWallpaper(null);
-    setReference(null);
-    document.getElementById("mediaSavedLabel").textContent = "Available for this session";
-  }
-}
-
-function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
-  });
-}
-
-function exposeQAControls() {
-  if (!query.has("qa")) return;
-  window.__TIMEWARP_QA__ = {
-    arm,
-    reveal: (choice) => {
-      if (!isValidChoice(choice)) throw new Error("Choice must be between 5 and 15");
-      arm();
-      beginReveal(choice);
-    },
-    reset: showSetup,
-    setSettings(next) {
-      settings = { ...settings, ...next };
-      syncControlsFromSettings();
-      applyAppearance();
-      refreshPreviewClock();
-    },
-    state() {
-      return { performanceMode, inputTotal, inputTapCount, cursorMinute, settings: { ...settings } };
-    },
-  };
-}
-
+});
+window.addEventListener("pagehide", () => {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* Already reported on save. */ }
+});
 async function initialize() {
-  syncControlsFromSettings();
+  const incoming = consumeShortcut();
+  syncSettings();
   applyAppearance();
-  refreshPreviewClock();
-  previewTimer = setInterval(refreshPreviewClock, 1000);
-  bindControls();
-  await loadSavedMedia();
-  if (isStandalone()) installNote.classList.add("is-hidden");
-  registerServiceWorker();
-  exposeQAControls();
+  const media = await Promise.allSettled(["wallpaper","reference","cover"].map(async kind => {
+    const blob = await readMedia(kind);
+    if (blob) setAsset(kind,blob);
+  }));
+  if (media.some(r => r.status === "rejected")) showToast("Images cannot be restored in this browser session.");
+  ready = true;
+  syncInput();
+  $("installNote").hidden = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  acceptShortcut(incoming);
+  setInterval(() => { if (["edit","preview"].includes(mode)) renderTime(new Date()); },1000);
+  if ("serviceWorker" in navigator) {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (mode === "setup" && !refreshing) { refreshing = true; location.reload(); }
+    });
+    navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).then(registration => registration.update()).catch(() => {});
+  }
 }
-
 initialize();

@@ -1,301 +1,128 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-    />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Clock" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta
-      name="description"
-      content="A private performance utility for the Time Warp illusion."
-    />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icon-180.png" />
-    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./app.css?v=9" />
-    <title>Clock</title>
-  </head>
-  <body>
-    <div id="app">
-      <section id="setupScreen" class="setup-screen" aria-label="Private setup">
-        <header class="setup-header">
-          <div>
-            <p class="eyebrow">Private setup</p>
-            <h1>Time Warp</h1>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Clock">
+  <meta name="theme-color" content="#000000">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-180.png">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./app.css?v=10">
+  <title>Clock</title>
+</head>
+<body>
+  <main id="app">
+    <section id="setupScreen" class="setup-screen" aria-label="Setup">
+      <header class="setup-header"><h1>Time Warp</h1><span class="version">10</span></header>
+      <nav class="tabs" aria-label="Settings">
+        <button type="button" data-tab="display" aria-pressed="true">Display</button>
+        <button type="button" data-tab="input" aria-pressed="false">Input</button>
+        <button type="button" data-tab="timing" aria-pressed="false">Timing</button>
+      </nav>
+      <div class="settings-content">
+        <section data-panel="display">
+          <button id="editClock" class="editor-entry" type="button"><span class="mini-wallpaper" aria-hidden="true"><span>9:41</span></span><span><strong>Clock &amp; date</strong><small>Edit on your wallpaper</small></span><span aria-hidden="true">&#8250;</span></button>
+          <div class="settings-group">
+            <label class="row" for="use24Hour"><span>24-hour time</span><input id="use24Hour" data-setting="use24Hour" type="checkbox" role="switch"></label>
+            <label class="row" for="showDate"><span>Show date</span><input id="showDate" data-setting="showDate" type="checkbox" role="switch"></label>
+            <label class="row" for="dateFormat"><span>Date format</span><select id="dateFormat" data-setting="dateFormat"><option value="long">Friday, September 4</option><option value="short">Fri Sep 4</option><option value="day-first">Friday 4 September</option></select></label>
           </div>
-          <div class="ready-pill" id="readyPill" aria-live="polite">
-            <span></span>
-            Demo ready
+          <p class="quiet" id="installNote">For performance, open from your Home Screen. In Safari: Share, then Add to Home Screen.</p>
+        </section>
+        <section data-panel="input" hidden>
+          <div class="settings-group">
+            <label class="row" for="inputMethod"><span>Input method</span><select id="inputMethod" data-setting="inputMethod"><option value="taps">Tap zones</option><option value="clipboard">Clipboard</option><option value="shortcut">Shortcut link</option><option value="number">Number</option><option value="calculator" id="calculatorOption" hidden disabled>Calculator</option></select></label>
+            <button id="editZones" class="row navigation" type="button"><span>Customize tap zones</span><span aria-hidden="true">&#8250;</span></button>
+            <label id="autoConfirmRow" class="row" for="autoConfirm"><span>Confirm taps</span><select id="autoConfirm" data-setting="autoConfirm"><option value="0">Confirm zone</option><option value="3">After 3 taps</option></select></label>
+            <label class="row" for="useCover"><span>Start on cover screen</span><input id="useCover" data-setting="useCover" type="checkbox" role="switch"></label>
+            <div class="row" id="coverImageRow"><label class="file-button" for="coverInput">Cover image</label><span class="media-actions"><label class="text-button" for="coverInput" id="coverLabel">Choose</label><button id="removeCover" class="icon-button" aria-label="Remove cover image" title="Remove cover image" type="button" hidden>&#215;</button></span></div>
           </div>
-        </header>
+          <p class="quiet" id="inputHelp"></p>
+          <div id="shortcutHelp" hidden>
+            <p class="quiet">In your Shortcut, finish with a URL and Open URLs. Replace NUMBER with your chosen minutes.</p>
+            <label class="field" for="shortcutURL">Shortcut URL<input id="shortcutURL" readonly spellcheck="false"></label>
+            <p class="quiet">The link opens in the browser iOS chooses; it may open Safari instead of the installed app. For the Home Screen app, use Clipboard.</p>
+          </div>
+          <label id="numberRow" class="row settings-group" for="chosenNumber"><span>Minutes to rewind</span><input id="chosenNumber" type="number" inputmode="numeric" min="1" max="180" step="1" value="10"></label>
+          <div id="pasteFallback" hidden><label class="field" for="pasteNumber">Paste minutes<input id="pasteNumber" inputmode="numeric" placeholder="Touch and hold to paste" autocomplete="off"></label></div>
+        </section>
+        <section data-panel="timing" hidden>
+          <div class="settings-group">
+            <label class="row" for="rewindDelay"><span>Hold before rewind <small>seconds</small></span><input id="rewindDelay" data-setting="rewindDelay" type="number" inputmode="decimal" min="0" max="60" step="0.5"></label>
+            <label class="row" for="rewindSpeed"><span>Rewind pace</span><select id="rewindSpeed" data-setting="rewindSpeed"><option value="200">Fast</option><option value="500">Natural</option><option value="800">Slow</option></select></label>
+          </div>
+          <div class="settings-group experiment">
+            <label class="row" for="calculatorEnabled"><span>Calculator disguise <small>Experimental</small></span><input id="calculatorEnabled" data-setting="calculatorEnabled" type="checkbox" role="switch"></label>
+          </div>
+          <p class="quiet">Adds Calculator to your input methods. Use their number in a real calculation, then hold = to load the last number entered, even after the result is shown.</p>
+        </section>
+      </div>
+      <footer class="setup-footer"><p id="setupError" class="error" role="alert" hidden></p><button id="performButton" class="primary" type="button" disabled>Loading...</button><span class="exit-hint">Two-finger swipe down returns to setup</span></footer>
+    </section>
 
-        <main class="setup-layout">
-          <section class="preview-column" aria-label="Lock screen preview">
-            <div class="preview-heading">
-              <div>
-                <p class="section-kicker">Live preview</p>
-                <h2>Match your lock screen</h2>
-              </div>
-              <button class="text-button" id="toggleReferenceButton" type="button" disabled>
-                Show reference
-              </button>
-            </div>
-
-            <div class="device-shell">
-              <div class="device-speaker" aria-hidden="true"></div>
-              <div class="lock-view preview-lock-view" id="previewLockView">
-                <div class="wallpaper-layer"></div>
-                <div class="legibility-layer"></div>
-                <img class="reference-layer" id="referenceLayer" alt="" />
-                <div class="preview-status" aria-hidden="true">
-                  <span></span>
-                  <div class="status-icons">
-                    <span class="signal-bars"><i></i><i></i><i></i><i></i></span>
-                    <svg viewBox="0 0 20 14"><path d="M2 5.2a12 12 0 0 1 16 0M5 8.2a7.6 7.6 0 0 1 10 0M8.2 11.2a2.8 2.8 0 0 1 3.6 0" /></svg>
-                    <span class="battery"><i></i></span>
-                  </div>
-                </div>
-                <div class="sim-island" aria-hidden="true"></div>
-                <div class="lock-glyph" aria-hidden="true">
-                  <svg viewBox="0 0 28 32">
-                    <path d="M7.4 13.1V9.2a6.6 6.6 0 0 1 13.2 0v3.9" />
-                    <rect x="4.6" y="12" width="18.8" height="15.5" rx="4.2" />
-                  </svg>
-                </div>
-                <div class="clock-stack">
-                  <div class="lock-date">Friday, September 4</div>
-                  <div class="lock-time">9:41</div>
-                </div>
-                <div class="quick-controls" aria-hidden="true">
-                  <div class="quick-control">
-                    <svg class="flashlight-icon" viewBox="0 0 32 32">
-                      <path d="m12.2 4.5 8.2-.1 1.1 5.1-10.1.1 0.8-5.1Z" />
-                      <path d="m12.1 11.2 9.2-.1-2.2 5.3v8.2a3.1 3.1 0 0 1-6.2 0v-8.2l-.8-5.2Z" />
-                    </svg>
-                  </div>
-                  <div class="quick-control">
-                    <svg class="camera-icon" viewBox="0 0 32 32">
-                      <path d="M5 11.2h5l1.8-3.1h8.5l1.8 3.1H27v14H5v-14Z" />
-                      <circle cx="16" cy="18" r="5.1" />
-                    </svg>
-                  </div>
-                </div>
-                <div class="home-indicator" aria-hidden="true"></div>
-              </div>
-            </div>
-
-            <div class="reference-opacity is-hidden" id="referenceOpacityRow">
-              <label for="referenceOpacity">Reference opacity</label>
-              <input id="referenceOpacity" type="range" min="10" max="90" value="50" />
-            </div>
-            <p class="preview-note">
-              Upload a screenshot of your real Lock Screen as a temporary alignment guide.
-              It never appears during the trick.
-            </p>
-          </section>
-
-          <section class="controls-column">
-            <article class="setup-card media-card">
-              <div class="card-title-row">
-                <div>
-                  <p class="section-kicker">1 · Images</p>
-                  <h2>Your exact phone</h2>
-                </div>
-                <span class="saved-label" id="mediaSavedLabel">Stored on this device</span>
-              </div>
-              <div class="upload-grid">
-                <label class="upload-button" for="wallpaperInput">
-                  <span class="upload-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM6.5 16l3.4-4 2.7 2.7 1.8-2 3.1 3.3M15.9 9.1h.1" /></svg>
-                  </span>
-                  <span><strong id="wallpaperLabel">Choose wallpaper</strong><small>Original image, without a clock</small></span>
-                </label>
-                <input id="wallpaperInput" type="file" accept="image/*" hidden />
-
-                <label class="upload-button secondary-upload" for="referenceInput">
-                  <span class="upload-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2.5" /><path d="M9 17h6" /></svg>
-                  </span>
-                  <span><strong id="referenceLabel">Add reference</strong><small>Optional Lock Screen screenshot</small></span>
-                </label>
-                <input id="referenceInput" type="file" accept="image/*" hidden />
-              </div>
-            </article>
-
-            <article class="setup-card">
-              <div class="card-title-row">
-                <div>
-                  <p class="section-kicker">2 · Appearance</p>
-                  <h2>Clock and wallpaper</h2>
-                </div>
-                <button class="text-button" id="resetAppearanceButton" type="button">Reset</button>
-              </div>
-
-              <div class="control-row">
-                <div class="control-copy"><label for="clockStyle">Clock style</label><small>Match the style selected on your iPhone</small></div>
-                <select id="clockStyle">
-                  <option value="system">System solid</option>
-                  <option value="rounded">Rounded</option>
-                  <option value="glass">Glass</option>
-                </select>
-              </div>
-
-              <div class="control-row">
-                <div class="control-copy"><label for="clockColor">Clock tint</label><small>Solid white is the most convincing default</small></div>
-                <input id="clockColor" class="color-control" type="color" value="#ffffff" />
-              </div>
-
-              <div class="slider-row">
-                <div class="control-copy"><label for="clockSize">Clock size</label><output id="clockSizeValue">24</output></div>
-                <input id="clockSize" type="range" min="17" max="34" step="0.5" value="24" />
-              </div>
-
-              <div class="slider-row">
-                <div class="control-copy"><label for="clockWeight">Clock weight</label><output id="clockWeightValue">520</output></div>
-                <input id="clockWeight" type="range" min="300" max="750" step="10" value="520" />
-              </div>
-
-              <div class="slider-row">
-                <div class="control-copy"><label for="clockPosition">Vertical position</label><output id="clockPositionValue">13%</output></div>
-                <input id="clockPosition" type="range" min="8" max="36" step="0.5" value="13" />
-              </div>
-
-              <div class="slider-row">
-                <div class="control-copy"><label for="clockOpacity">Clock opacity</label><output id="clockOpacityValue">100%</output></div>
-                <input id="clockOpacity" type="range" min="55" max="100" step="1" value="100" />
-              </div>
-
-              <div class="slider-row">
-                <div class="control-copy"><label for="wallpaperZoom">Wallpaper zoom</label><output id="wallpaperZoomValue">100%</output></div>
-                <input id="wallpaperZoom" type="range" min="100" max="180" step="1" value="100" />
-              </div>
-
-              <div class="split-sliders">
-                <div class="slider-row compact-slider">
-                  <div class="control-copy"><label for="wallpaperX">Move left/right</label></div>
-                  <input id="wallpaperX" type="range" min="0" max="100" value="50" />
-                </div>
-                <div class="slider-row compact-slider">
-                  <div class="control-copy"><label for="wallpaperY">Move up/down</label></div>
-                  <input id="wallpaperY" type="range" min="0" max="100" value="50" />
-                </div>
-              </div>
-
-              <div class="toggle-grid">
-                <label class="toggle-row"><span><strong>Date</strong><small>Above the clock</small></span><input id="showDate" type="checkbox" checked /><i></i></label>
-                <label class="toggle-row"><span><strong>Lock symbol</strong><small>Top center</small></span><input id="showLock" type="checkbox" checked /><i></i></label>
-                <label class="toggle-row"><span><strong>Quick controls</strong><small>Flashlight and camera</small></span><input id="showControls" type="checkbox" checked /><i></i></label>
-                <label class="toggle-row"><span><strong>24-hour time</strong><small>Use device preference</small></span><input id="use24Hour" type="checkbox" /><i></i></label>
-              </div>
-            </article>
-
-            <article class="setup-card">
-              <div class="card-title-row">
-                <div>
-                  <p class="section-kicker">3 · Performance</p>
-                  <h2>Rewind timing</h2>
-                </div>
-              </div>
-              <div class="slider-row">
-                <div class="control-copy"><label for="rewindDelay">Hold before rewind</label><output id="rewindDelayValue">6.0s</output></div>
-                <input id="rewindDelay" type="range" min="2" max="20" step="0.5" value="6" />
-              </div>
-              <div class="slider-row">
-                <div class="control-copy"><label for="rewindSpeed">Time between minutes</label><output id="rewindSpeedValue">500ms</output></div>
-                <input id="rewindSpeed" type="range" min="150" max="900" step="25" value="500" />
-              </div>
-              <div class="timing-summary" id="timingSummary">A 10-minute choice takes about 11 seconds from wake to landing.</div>
-            </article>
-
-            <article class="setup-card code-card">
-              <div class="card-title-row">
-                <div>
-                  <p class="section-kicker">Secret input</p>
-                  <h2>Four invisible zones</h2>
-                </div>
-                <button class="secondary-button" id="rehearseButton" type="button">Rehearse</button>
-              </div>
-              <div class="code-map" aria-label="Secret tap map">
-                <div><span>Top left</span><strong>+1</strong></div>
-                <div><span>Top right</span><strong>+2</strong></div>
-                <div><span>Middle left</span><strong>+5</strong></div>
-                <div><span>Middle right</span><strong>+10</strong></div>
-                <div class="confirm-zone"><span>Bottom third</span><strong>Confirm / wake</strong></div>
-              </div>
-              <p class="code-note">All choices from 5–15 work. Three value taps wake automatically. Hold the upper-left corner to cancel while armed.</p>
-            </article>
-
-            <article class="install-note" id="installNote">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 14v6h14v-6" /></svg>
-              <div><strong>For the cleanest performance</strong><span>Open this page in Safari, tap Share, then Add to Home Screen.</span></div>
-            </article>
-
-            <button class="danger-text" id="clearAllButton" type="button">Clear saved images and settings</button>
-          </section>
-        </main>
-
-        <div class="arm-dock">
-          <div><strong id="armStatus">Demo wallpaper active</strong><span>The display will turn completely black.</span></div>
-          <button id="armButton" type="button"><span>Arm performance</span><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></button>
+    <section id="stage" class="stage" aria-label="Lock screen" hidden>
+      <div id="lockView" class="lock-view">
+        <div class="wallpaper-layer"></div>
+        <div id="dateText" class="lock-text lock-date" data-part="date"></div>
+        <div id="clockText" class="lock-text lock-time" data-part="clock"></div>
+        <img id="referenceLayer" class="reference-layer" alt="Lock screen alignment reference" hidden>
+      </div>
+      <div id="editorUI" hidden>
+        <header class="editor-toolbar"><button id="editorDone" type="button">Done</button><button id="editorPreview" type="button">Preview</button></header>
+        <div id="editorPanel" class="editor-panel">
+          <div class="panel-heading"><div class="tabs" aria-label="Edit element"><button type="button" data-part-tab="clock" aria-pressed="true">Clock</button><button type="button" data-part-tab="date" aria-pressed="false">Date</button><button type="button" data-part-tab="wallpaper" aria-pressed="false">Image</button></div><button id="movePanel" class="icon-button" aria-label="Move controls to top" title="Move controls to top" type="button">&#8597;</button></div>
+          <div id="textControls">
+            <div class="row style-row"><label for="textStyle">Style</label><select id="textStyle"><option value="system">System</option><option value="rounded">Rounded</option><option value="serif">Serif</option><option value="mono">Monospaced</option><option value="glass">Glass</option></select><input id="textColor" type="color" aria-label="Text color" title="Text color"></div>
+            <label class="range-row" for="textSize"><span>Size</span><input id="textSize" type="range" step="0.1"><output id="sizeValue"></output></label>
+            <label class="range-row" for="textWeight"><span>Thickness</span><input id="textWeight" type="range" min="100" max="900" step="10"><output id="weightValue"></output></label>
+            <label class="range-row" for="textOpacity"><span>Opacity</span><input id="textOpacity" type="range" min="0" max="100" step="1"><output id="opacityValue"></output></label>
+          </div>
+          <div id="imageControls" hidden>
+            <div class="row"><label for="wallpaperInput">Wallpaper</label><label class="text-button" id="wallpaperLabel" for="wallpaperInput">Choose</label></div>
+            <label class="range-row" for="wallpaperZoom"><span>Zoom</span><input id="wallpaperZoom" data-setting="wallpaperZoom" type="range" min="100" max="200" step="1"><output id="zoomValue"></output></label>
+            <div class="row"><label for="referenceInput">Reference</label><span class="media-actions"><label class="text-button" id="referenceLabel" for="referenceInput">Choose</label><button id="removeReference" type="button" class="icon-button" aria-label="Remove reference" title="Remove reference" hidden>&#215;</button></span></div>
+          </div>
+          <label id="referenceRow" class="range-row reference-row" for="referenceOpacity" hidden><span>Reference</span><input id="referenceOpacity" type="range" min="0" max="100" value="50"><output id="referenceValue">50%</output></label>
         </div>
-      </section>
-
-      <section id="armedScreen" class="performance-screen armed-screen" aria-label="Armed performance screen">
-        <div class="assist-dot" id="assistDot" aria-hidden="true"></div>
-      </section>
-
-      <section id="lockScreen" class="performance-screen fake-lock-screen" aria-label="Lock screen">
-        <div class="lock-view performance-lock-view" id="performanceLockView">
-          <div class="wallpaper-layer"></div>
-          <div class="legibility-layer"></div>
-          <div class="lock-glyph" aria-hidden="true">
-            <svg viewBox="0 0 28 32">
-              <path d="M7.4 13.1V9.2a6.6 6.6 0 0 1 13.2 0v3.9" />
-              <rect x="4.6" y="12" width="18.8" height="15.5" rx="4.2" />
-            </svg>
-          </div>
-          <div class="clock-stack">
-            <div class="lock-date">Friday, September 4</div>
-            <div class="lock-time">9:41</div>
-          </div>
-          <div class="quick-controls" aria-hidden="true">
-            <div class="quick-control">
-              <svg class="flashlight-icon" viewBox="0 0 32 32">
-                <path d="m12.2 4.5 8.2-.1 1.1 5.1-10.1.1 0.8-5.1Z" />
-                <path d="m12.1 11.2 9.2-.1-2.2 5.3v8.2a3.1 3.1 0 0 1-6.2 0v-8.2l-.8-5.2Z" />
-              </svg>
-            </div>
-            <div class="quick-control">
-              <svg class="camera-icon" viewBox="0 0 32 32">
-                <path d="M5 11.2h5l1.8-3.1h8.5l1.8 3.1H27v14H5v-14Z" />
-                <circle cx="16" cy="18" r="5.1" />
-              </svg>
-            </div>
-          </div>
-          <div class="home-indicator" aria-hidden="true"></div>
-        </div>
-      </section>
-
-      <div class="toast" id="toast" role="status" aria-live="polite"></div>
-      <div class="confirm-sheet" id="confirmSheet" aria-hidden="true">
-        <div>
-          <h2>Clear this device?</h2>
-          <p>Your wallpaper, reference screenshot, and visual settings will be removed.</p>
-          <div class="confirm-actions">
-            <button class="secondary-button" id="cancelClearButton" type="button">Cancel</button>
-            <button class="destructive-button" id="confirmClearButton" type="button">Clear everything</button>
+      </div>
+      <div id="coverLayer" class="cover-layer" hidden></div>
+      <div id="calculator" class="calculator" aria-label="Calculator" hidden>
+        <div class="calculator-inner">
+          <output id="calculatorDisplay" aria-live="polite">0</output>
+          <div class="calculator-keys">
+            <button type="button" class="utility" data-calc="clear">AC</button><button type="button" class="utility" data-calc="sign" aria-label="Change sign">+/-</button><button type="button" class="utility" data-calc="%">%</button><button type="button" class="operator" data-calc="/" aria-label="Divide">&#247;</button>
+            <button type="button" data-calc="7">7</button><button type="button" data-calc="8">8</button><button type="button" data-calc="9">9</button><button type="button" class="operator" data-calc="*" aria-label="Multiply">&#215;</button>
+            <button type="button" data-calc="4">4</button><button type="button" data-calc="5">5</button><button type="button" data-calc="6">6</button><button type="button" class="operator" data-calc="-" aria-label="Subtract">&#8722;</button>
+            <button type="button" data-calc="1">1</button><button type="button" data-calc="2">2</button><button type="button" data-calc="3">3</button><button type="button" class="operator" data-calc="+" aria-label="Add">+</button>
+            <button type="button" class="zero" data-calc="0">0</button><button type="button" data-calc=".">.</button><button type="button" id="calculatorEquals" class="operator" data-calc="=">=</button>
           </div>
         </div>
       </div>
-    </div>
-
-    <script type="module" src="./app.js?v=9"></script>
-  </body>
+      <div id="zoneEditor" hidden>
+        <header class="editor-toolbar"><button id="zonesDone" type="button">Done</button><span>Tap zones</span></header>
+        <div id="zoneMap" class="zone-map">
+          <label class="zone zone-tl"><span>Top left</span><input data-zone-value="0" type="number" inputmode="numeric" min="1" max="180" aria-label="Top left increment"></label>
+          <label class="zone zone-tr"><span>Top right</span><input data-zone-value="1" type="number" inputmode="numeric" min="1" max="180" aria-label="Top right increment"></label>
+          <label class="zone zone-ml"><span>Middle left</span><input data-zone-value="2" type="number" inputmode="numeric" min="1" max="180" aria-label="Middle left increment"></label>
+          <label class="zone zone-mr"><span>Middle right</span><input data-zone-value="3" type="number" inputmode="numeric" min="1" max="180" aria-label="Middle right increment"></label>
+          <div class="zone zone-confirm">Confirm</div>
+          <button class="divider divider-x" data-divider="x" type="button" aria-label="Drag left and right divider" title="Drag to resize zones"><span>&#8596;</span></button>
+          <button class="divider divider-y" data-divider="y" type="button" aria-label="Drag upper and middle divider" title="Drag to resize zones"><span>&#8597;</span></button>
+          <button class="divider divider-confirm" data-divider="confirm" type="button" aria-label="Drag confirm zone divider" title="Drag to resize zones"><span>&#8597;</span></button>
+        </div>
+      </div>
+      <div id="visibleInput" class="visible-input" hidden><button id="entryBack" type="button">Back</button><output id="tapTotal">0</output><span>Minutes to rewind</span></div>
+    </section>
+    <input id="wallpaperInput" type="file" accept="image/*" hidden>
+    <input id="referenceInput" type="file" accept="image/*" hidden>
+    <input id="coverInput" type="file" accept="image/*" hidden>
+    <div id="toast" role="status" hidden></div>
+  </main>
+  <script type="module" src="./app.js?v=10"></script>
+</body>
 </html>

@@ -1,59 +1,50 @@
-# Time Warp — iPhone Lock-Screen Magic
+# Time Warp
 
-Time Warp is an installable phone magic utility. A spectator freely names any number from 5 through 15. While the display appears completely off, the performer enters that number through an invisible tap map. The phone appears to wake to a personalized iPhone-style lock screen whose clock is exactly that many minutes in the future. After a configurable hold, the clock visibly rewinds one minute at a time until it reaches the real current time.
+Time Warp is an installable iPhone performance utility. It presents a personalized lock screen at a secretly chosen number of minutes in the future, then rewinds minute by minute to the real time.
 
-The trick does **not** require a force: every number from 5 to 15 can be entered in three value taps or fewer.
+## Setup
 
-## Performance flow
+The app opens to three compact settings pages:
 
-1. Open the private setup screen.
-2. Add the wallpaper used on the real phone and calibrate the clock against the live preview or an optional reference screenshot.
-3. Tap **Arm performance**. The display becomes completely black.
-4. Enter the freely named number with the invisible map below.
-5. Tap the bottom third to confirm and wake, or let the third value tap auto-confirm.
-6. The lock screen shows the chosen number of minutes in the future, holds, rewinds one minute at a time, and lands on the actual current minute.
+- **Display** opens a full-screen wallpaper editor. Drag the clock and date into position, then adjust each element's style, size, thickness, color, and opacity in the floating controls. **Preview** hides the editing controls and uses the exact performance view.
+- **Input** selects tap zones, Clipboard, a Shortcut link, a visible number field, or the optional experimental Calculator. The cover screen is optional and can be black or use a saved image.
+- **Timing** sets the hold and rewind pace and enables the experimental Calculator input.
 
-## Secret input map
+Wallpaper, reference screenshot, cover image, appearance, timing, and input choices stay on the device. Images are stored in IndexedDB and are not uploaded.
 
-| Area | Value |
-| --- | ---: |
-| Upper left | 1 |
-| Upper right | 2 |
-| Middle left | 5 |
-| Middle right | 10 |
-| Bottom third | Confirm / wake |
+## Performance
 
-Taps add together and areas may repeat. For example, 9 is `2 + 2 + 5`, and 14 is `2 + 2 + 10`; both auto-confirm on the third tap. Confirming before any value tap is a one-tap shortcut for 5.
+### Tap zones
 
-## One-time setup
+The default invisible zones add 1, 2, 5, or 10; the bottom area confirms. Their boundaries and values are editable. Turning off the cover shows the map while entering.
 
-1. Enable GitHub Pages for the repository's `main` branch and open the Pages URL in Safari on the performing iPhone.
-2. Use **Share → Add to Home Screen** and give it an innocent name such as “Clock.”
-3. Open the installed app and upload the original lock-screen wallpaper without its clock.
-4. If useful, upload a screenshot of the genuine lock screen as an alignment overlay.
-5. Match clock style, tint, size, weight, vertical position, opacity, and wallpaper crop.
-6. Choose the dramatic hold and rewind speed, then rehearse the invisible input.
+### Clipboard
 
-The wallpaper, reference, appearance, and timing persist on that device. Uploaded images stay in the browser's IndexedDB and are not sent anywhere by this PWA.
+With a cover enabled:
 
-## Performance controls
+1. Start the performance.
+2. Run a Shortcut that copies the chosen whole number to the clipboard.
+3. Return to Time Warp and tap the cover.
+4. The app reads and validates the clipboard before it shows the lock screen. WebKit may display a system **Paste** prompt.
 
-- Hold the upper-left corner for 1.25 seconds while armed to disarm.
-- Triple-tap the upper-left corner after the reveal to reset for another performance.
-- An invalid total gives a tiny vibration where supported and silently resets the input.
-- The app requests wake lock, full screen, and portrait orientation where supported.
+Without a cover, **Paste & perform** reads the clipboard while the setup button is pressed. If programmatic access is unavailable, the app offers a normal paste field. A failed or invalid read never reveals the lock screen.
 
-## Reality of the illusion
+### Shortcut link
 
-The app reproduces the visible lock-screen composition: personal wallpaper, large live-formatted time, date, lock glyph, optional bottom controls, and home indicator. It also handles midnight correctly and follows the real clock after the rewind lands. iOS may retain its native status bar in a standalone web app; the effect is designed to tolerate that system-controlled area.
+Pass a whole number from 1 through 180 in the URL:
 
-## Files
+https://magicaleb.github.io/Time-warp/#minutes=NUMBER
 
-- `index.html` — setup and performance screens
-- `app.css` — responsive iPhone-style lock-screen rendering
-- `app.js` — persistence, secret input, reveal, rewind, and recovery controls
-- `core.js` — tested time and input logic
-- `manifest.webmanifest` and `sw.js` — installable, offline-capable PWA shell
-- `icon-*` and `icon.svg` — neutral Clock home-screen icon
+The app removes the number from the visible URL as soon as it reads it. A link opened from Shortcuts may open Safari rather than the installed Home Screen app; Clipboard is the reliable bridge back into an already-open PWA.
 
-There are no runtime dependencies or build step. All URLs are relative so the app works on GitHub Pages under the repository subpath.
+### Calculator experiment
+
+Enable **Calculator disguise** under Timing, then choose Calculator as the input. It performs ordinary arithmetic. Holding the equals button for 0.7 seconds secretly loads the last number entered, even after showing a calculated result. A normal tap on equals behaves normally.
+
+## Controls
+
+- Two-finger swipe down from any performance screen returns to setup.
+- A cover tap reveals a preloaded Number, Shortcut, or Calculator value.
+- The revealed clock fades in before the configured hold and rewind begin.
+
+Use Safari's **Add to Home Screen** for the app-style presentation. The PWA works offline after its shell is cached.

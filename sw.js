@@ -1,4 +1,4 @@
-const CACHE_NAME = "time-warp-shell-v9";
+const CACHE_NAME = "time-warp-shell-v10";
 const CACHE_PREFIX = "time-warp-shell-";
 const ROOT = new URL("./", self.location.href);
 const SHELL = [
@@ -7,6 +7,10 @@ const SHELL = [
   "app.css",
   "core.js",
   "app.js",
+  "settings.js",
+  "media.js",
+  "round.js",
+  "calculator.js",
   "manifest.webmanifest",
   "icon.svg",
   "icon-180.png",

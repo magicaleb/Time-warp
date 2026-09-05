@@ -5,19 +5,22 @@ export const INPUT_VALUES = Object.freeze({
   middleRight: 10,
 });
 
-export const MIN_CHOICE = 5;
-export const MAX_CHOICE = 15;
+export const MIN_CHOICE = 1;
+export const MAX_CHOICE = 180;
 
-export function getInputZone(x, y, width, height) {
-  if (y >= height * (2 / 3)) return { kind: "confirm", value: 0 };
+export function getInputZone(x, y, width, height, zones = { x: 50, y: 100 / 3, confirm: 200 / 3, values: [1, 2, 5, 10] }) {
+  if (y >= height * zones.confirm / 100) return { kind: "confirm", value: 0 };
 
-  const isLeft = x < width / 2;
-  const isTop = y < height / 3;
+  const isLeft = x < width * zones.x / 100;
+  const isTop = y < height * zones.y / 100;
 
-  if (isTop && isLeft) return { kind: "value", value: INPUT_VALUES.topLeft };
-  if (isTop && !isLeft) return { kind: "value", value: INPUT_VALUES.topRight };
-  if (!isTop && isLeft) return { kind: "value", value: INPUT_VALUES.middleLeft };
-  return { kind: "value", value: INPUT_VALUES.middleRight };
+  return { kind: "value", value: zones.values[(isTop ? 0 : 2) + (isLeft ? 0 : 1)] };
+}
+
+export function parseMinutes(text) {
+  if (typeof text !== "string" || !/^\d{1,3}$/.test(text.trim())) return null;
+  const value = Number(text.trim());
+  return isValidChoice(value) ? value : null;
 }
 
 export function isValidChoice(value) {
@@ -60,7 +63,13 @@ export function formatClock(date, use24Hour = false) {
     .replace(/\s?[AP]M$/i, "");
 }
 
-export function formatLockDate(date) {
+export function formatLockDate(date, style = "long") {
+  if (style === "day-first") {
+    return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" }).format(date);
+  }
+  if (style === "short") {
+    return new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(date).replace(/,/g, "");
+  }
   return new Intl.DateTimeFormat(undefined, {
     weekday: "long",
     month: "long",

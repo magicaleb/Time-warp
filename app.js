@@ -1,8 +1,8 @@
-import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=16";
-import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=16";
-import { readMedia, writeMedia, validateImage } from "./media.js?v=16";
-import { Round } from "./round.js?v=16";
-import { Calculator } from "./calculator.js?v=16";
+import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=17";
+import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=17";
+import { readMedia, writeMedia, validateImage } from "./media.js?v=17";
+import { Round } from "./round.js?v=17";
+import { Calculator } from "./calculator.js?v=17";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");

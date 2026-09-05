@@ -1,4 +1,4 @@
-const CACHE_NAME = "time-warp-shell-v16";
+const CACHE_NAME = "time-warp-shell-v17";
 const CACHE_PREFIX = "time-warp-shell-";
 const ROOT = new URL("./", self.location.href);
 const SHELL = [

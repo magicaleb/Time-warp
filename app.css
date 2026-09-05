@@ -119,3 +119,7 @@ input[type=color] { width: 32px; height: 32px; padding: 0; border: 0; border-rad
 .calculator button.utility { background: #a5a5a5; color: #000; }
 .calculator button.zero { grid-column: span 2; aspect-ratio: auto; border-radius: 60px; text-align: left; padding-left: 30px; }
 @media (max-height: 680px) { .setup-header { padding-bottom: 12px; } .settings-content { padding-top: 12px; } .row { min-height: 52px; } .editor-entry { padding-bottom: 14px; } .range-row { min-height: 36px; } .calculator-inner { max-width: 300px; } .calculator output { font-size: 56px; padding: 12px 8px; } .calculator-keys { gap: 8px; } }
+@media (min-width: 700px) {
+  .stage { inset: 20px auto auto 50%; width: 390px; height: 844px; transform: translateX(-50%); border-radius: 48px; box-shadow: 0 25px 70px #0009; }
+  .lock-view, .cover-layer, .calculator, .zone-map { border-radius: inherit; }
+}

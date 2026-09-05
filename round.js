@@ -1,8 +1,8 @@
-import { dateFromMinute, fakeMinuteFromNow, minuteStamp, nextRewindMinute, isValidChoice, parseMinutes } from "./core.js?v=12";
+import { dateFromMinute, fakeMinuteFromNow, minuteStamp, nextRewindMinute, isValidChoice, parseMinutes } from "./core.js?v=13";
 
 // Every round owns its timers and async input. Cancellation invalidates late clipboard results.
 export class Round {
-  constructor({ now = Date.now, schedule = setTimeout, cancel = clearTimeout, change = () => {} } = {}) {
+  constructor({ now = Date.now, schedule = (callback, delay) => setTimeout(callback, delay), cancel = timer => clearTimeout(timer), change = () => {} } = {}) {
     this.now = now;
     this.schedule = schedule;
     this.cancelTimer = cancel;

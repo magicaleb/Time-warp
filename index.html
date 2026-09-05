@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Clock" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#000000" />
     <meta name="format-detection" content="telephone=no" />
     <meta
       name="description"
@@ -19,10 +19,19 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./app.css?v=6" />
+    <link rel="stylesheet" href="./app.css?v=7" />
     <title>Clock</title>
+    <script>
+      if (
+        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+      ) {
+        document.documentElement.classList.add("is-ios");
+      }
+    </script>
   </head>
   <body>
+    <div id="status-bar-tint" aria-hidden="true"></div>
     <div id="app">
       <section id="setupScreen" class="setup-screen" aria-label="Private setup">
         <header class="setup-header">
@@ -296,6 +305,6 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=6"></script>
+    <script type="module" src="./app.js?v=7"></script>
   </body>
 </html>

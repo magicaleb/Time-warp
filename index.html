@@ -5,26 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Clock">
   <meta name="theme-color" content="#000000">
   <meta name="format-detection" content="telephone=no">
-  <script>
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) {
-      document.documentElement.classList.add("is-ios");
-    }
-  </script>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-180.png">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./app.css?v=14">
+  <link rel="stylesheet" href="./app.css?v=15">
   <title>Clock</title>
 </head>
 <body>
   <main id="app">
     <section id="setupScreen" class="setup-screen" aria-label="Setup">
-      <header class="setup-header"><h1>Time Warp</h1><span class="version">14</span></header>
+      <header class="setup-header"><h1>Time Warp</h1><span class="version">15</span></header>
       <nav class="tabs" aria-label="Settings">
         <button type="button" data-tab="display" aria-pressed="true">Display</button>
         <button type="button" data-tab="input" aria-pressed="false">Input</button>
@@ -72,7 +66,6 @@
     </section>
 
     <section id="stage" class="stage" aria-label="Lock screen" hidden>
-      <div id="status-bar-tint" aria-hidden="true"></div>
       <div id="lockView" class="lock-view">
         <div class="wallpaper-layer"></div>
         <div id="dateText" class="lock-text lock-date" data-part="date"></div>
@@ -130,6 +123,6 @@
     <input id="coverInput" type="file" accept="image/*" hidden>
     <div id="toast" role="status" hidden></div>
   </main>
-  <script type="module" src="./app.js?v=14"></script>
+  <script type="module" src="./app.js?v=15"></script>
 </body>
 </html>

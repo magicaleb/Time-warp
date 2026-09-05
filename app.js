@@ -1,8 +1,8 @@
-import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=14";
-import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=14";
-import { readMedia, writeMedia, validateImage } from "./media.js?v=14";
-import { Round } from "./round.js?v=14";
-import { Calculator } from "./calculator.js?v=14";
+import { formatClock, formatLockDate, getInputZone, isValidChoice, parseMinutes } from "./core.js?v=15";
+import { SETTINGS_KEY, LEGACY_KEY, normalizeSettings, clamp } from "./settings.js?v=15";
+import { readMedia, writeMedia, validateImage } from "./media.js?v=15";
+import { Round } from "./round.js?v=15";
+import { Calculator } from "./calculator.js?v=15";
 
 const $ = (id) => document.getElementById(id);
 const stage = $("stage");
@@ -174,41 +174,19 @@ function syncZones() {
     el.disabled = mode === "performance";
   });
 }
-async function updateTopTint(kind, blob) {
-  const property = kind === "wallpaper" ? "--event-color" : "--cover-tint-color";
-  if (!blob) {
-    document.documentElement.style.removeProperty(property);
-    return;
-  }
-  try {
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = 32;
-    canvas.height = 1;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    context.drawImage(bitmap, 0, 0, bitmap.width, Math.max(1, bitmap.height * .025), 0, 0, 32, 1);
-    bitmap.close?.();
-    const pixels = context.getImageData(0, 0, 32, 1).data;
-    let red = 0, green = 0, blue = 0;
-    for (let index = 0; index < pixels.length; index += 4) {
-      red += pixels[index]; green += pixels[index + 1]; blue += pixels[index + 2];
-    }
-    const count = pixels.length / 4;
-    document.documentElement.style.setProperty(property, `rgb(${Math.round(red/count)} ${Math.round(green/count)} ${Math.round(blue/count)})`);
-  } catch { /* The CSS fallback remains a safe solid tint. */ }
-}
 function setAsset(kind, blob) {
   if (assets[kind]) URL.revokeObjectURL(assets[kind]);
   assets[kind] = blob ? URL.createObjectURL(blob) : null;
   const image = assets[kind] ? 'url("' + assets[kind] + '")' : "";
   if (kind === "wallpaper") {
-    document.querySelector(".wallpaper-layer").style.backgroundImage = image;
-    document.querySelector(".mini-wallpaper").style.backgroundImage = image;
-    updateTopTint("wallpaper", blob);
+    if (blob) document.documentElement.style.setProperty("--wallpaper-image", image);
+    else document.documentElement.style.removeProperty("--wallpaper-image");
+    document.querySelector(".wallpaper-layer").style.removeProperty("background-image");
+    document.querySelector(".mini-wallpaper").style.removeProperty("background-image");
   } else if (kind === "cover") {
     $("coverLayer").style.backgroundImage = image;
     $("removeCover").hidden = !blob;
-    updateTopTint("cover", blob);
+    document.documentElement.style.setProperty("--cover-image", image || "none");
   } else {
     if (blob) $("referenceLayer").src = assets.reference;
     else $("referenceLayer").removeAttribute("src");

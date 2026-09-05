@@ -5,15 +5,30 @@
   background: #000;
   --accent: #78d7c0;
   --line: #343438;
-  --event-color: #76a8df;
-  --cover-tint-color: #000000;
-  --status-tint-h: 16px;
-  --color-shift-ms: 350ms;
+  --cover-image: none;
   --wallpaper-image: radial-gradient(circle at 28% 18%, rgba(143,194,255,.9) 0 8%, transparent 31%), radial-gradient(circle at 82% 26%, rgba(246,160,205,.8) 0 5%, transparent 27%), radial-gradient(circle at 48% 86%, rgba(51,107,187,.9), transparent 48%), linear-gradient(145deg,#1d3354 0%,#3b4d79 35%,#6b4d79 68%,#171d33 100%);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; }
+/* iOS may reserve pixels outside the standalone layout viewport. Paint the
+   document canvas with the active performance surface so those pixels cannot
+   fall back to a black strip. On a phone this aligns exactly with the stage. */
+html:has(#stage:not([hidden])), body:has(#stage:not([hidden])) {
+  background-color: #17243d;
+  background-image: var(--wallpaper-image);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: var(--wallpaper-x,50%) var(--wallpaper-y,50%);
+}
+html:has(#stage:not([hidden]) #coverLayer:not([hidden])), body:has(#stage:not([hidden]) #coverLayer:not([hidden])) {
+  background-color: #000;
+  background-image: var(--cover-image);
+}
+html:has(#stage:not([hidden]) #calculator:not([hidden])), body:has(#stage:not([hidden]) #calculator:not([hidden])) {
+  background-color: #000;
+  background-image: none;
+}
 body { overscroll-behavior: none; }
 button, input, select { font: inherit; }
 button, .text-button, .file-button { cursor: pointer; }
@@ -88,24 +103,6 @@ input[type=color] { width: 32px; height: 32px; padding: 0; border: 0; border-rad
 .range-row input { width: 100%; min-width: 0; height: 32px; margin: 0; }
 .range-row output { font-size: 11px; color: #aaaab3; text-align: right; font-variant-numeric: tabular-nums; }
 .reference-row { border-top: 1px solid var(--line); margin-top: 5px; }
-#status-bar-tint { display: none; }
-/* iOS 27 standalone PWAs add a colored blur at the top edge. This thin,
-   fixed overlay masks it without adding padding or shortening the wallpaper. */
-@media (display-mode: standalone) and (orientation: portrait) {
-  .is-ios #status-bar-tint {
-    display: block;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--status-tint-h);
-    z-index: 2000;
-    pointer-events: none;
-    background-color: var(--event-color);
-    transition: background-color var(--color-shift-ms) ease-in-out;
-  }
-  .is-ios .stage:has(#coverLayer:not([hidden])) #status-bar-tint { background-color: var(--cover-tint-color); }
-}
 .cover-layer { position: absolute; z-index: 5; inset: 0; background-color: #000; background-position: center; background-size: cover; }
 .stage.waking .lock-view { animation: wake-screen 450ms ease-out both; }
 @keyframes wake-screen { from { opacity: 0; } to { opacity: 1; } }

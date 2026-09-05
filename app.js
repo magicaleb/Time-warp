@@ -109,6 +109,7 @@ let rewindTimer = null;
 let liveSyncTimer = null;
 let cursorMinute = null;
 let resetCornerTaps = [];
+let twoFingerSwipe = null;
 
 function loadSettings() {
   try {
@@ -525,6 +526,45 @@ function onLockScreenPointerUp(event) {
   }
 }
 
+function averageTouchPoint(touches) {
+  const points = [...touches].slice(0, 2);
+  return {
+    x: points.reduce((total, touch) => total + touch.clientX, 0) / points.length,
+    y: points.reduce((total, touch) => total + touch.clientY, 0) / points.length,
+  };
+}
+
+function onPerformanceTouchStart(event) {
+  if (performanceMode === "setup" || event.touches.length !== 2) return;
+  event.preventDefault();
+  clearTimeout(cancelHoldTimer);
+  if (activePointer) activePointer.cancelled = true;
+  twoFingerSwipe = {
+    ...averageTouchPoint(event.touches),
+    triggered: false,
+  };
+}
+
+function onPerformanceTouchMove(event) {
+  if (!twoFingerSwipe || twoFingerSwipe.triggered || event.touches.length < 2) return;
+  const point = averageTouchPoint(event.touches);
+  const deltaX = point.x - twoFingerSwipe.x;
+  const deltaY = point.y - twoFingerSwipe.y;
+
+  if (deltaY > 90 && Math.abs(deltaX) < 100) {
+    event.preventDefault();
+    twoFingerSwipe.triggered = true;
+    vibrate(20);
+    showSetup();
+    showToast("Ready for setup.");
+  }
+}
+
+function onPerformanceTouchEnd() {
+  if (!twoFingerSwipe) return;
+  twoFingerSwipe = null;
+}
+
 async function acceptMediaFile(kind, file) {
   if (!file?.type.startsWith("image/")) {
     showToast("Choose an image file.");
@@ -636,8 +676,16 @@ function bindControls() {
   armedScreen.addEventListener("pointerdown", onArmedPointerDown, { passive: false });
   armedScreen.addEventListener("pointerup", onArmedPointerUp, { passive: false });
   armedScreen.addEventListener("pointercancel", onArmedPointerCancel);
+  armedScreen.addEventListener("touchstart", onPerformanceTouchStart, { passive: false });
+  armedScreen.addEventListener("touchmove", onPerformanceTouchMove, { passive: false });
+  armedScreen.addEventListener("touchend", onPerformanceTouchEnd);
+  armedScreen.addEventListener("touchcancel", onPerformanceTouchEnd);
   armedScreen.addEventListener("contextmenu", (event) => event.preventDefault());
   lockScreen.addEventListener("pointerup", onLockScreenPointerUp);
+  lockScreen.addEventListener("touchstart", onPerformanceTouchStart, { passive: false });
+  lockScreen.addEventListener("touchmove", onPerformanceTouchMove, { passive: false });
+  lockScreen.addEventListener("touchend", onPerformanceTouchEnd);
+  lockScreen.addEventListener("touchcancel", onPerformanceTouchEnd);
   lockScreen.addEventListener("contextmenu", (event) => event.preventDefault());
 
   document.addEventListener("visibilitychange", () => {

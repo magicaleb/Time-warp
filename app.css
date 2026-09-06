@@ -92,7 +92,10 @@ code { color:#cbdcff; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; f
 .error { margin:0; color:#ff6961; font-size:12px; text-align:center; }
 
 /* stage + lock screen */
-.stage { position:fixed; inset:0; height:100svh; overflow:hidden; background:#000; touch-action:none; user-select:none; -webkit-user-select:none; }
+/* iOS standalone: fixed + inset:0 must define the stage by its edges.
+   Do not add 100svh/100dvh here; WebKit can report those shorter than
+   the standalone canvas and leave a black strip at the bottom. */
+.stage { position:fixed; inset:0; overflow:hidden; background:#000; touch-action:none; user-select:none; -webkit-user-select:none; }
 .wallpaper { position:absolute; inset:0; background-image:var(--wallpaper-image); background-size:cover; background-position:var(--wallpaper-x) var(--wallpaper-y); transform:scale(var(--wallpaper-zoom)); transform-origin:center; will-change:transform,background-position; }
 .reference { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; pointer-events:none; z-index:4; }
 .lock-text { position:absolute; z-index:3; transform:translate(-50%,-50%); white-space:nowrap; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.14); line-height:.92; touch-action:none; }

@@ -1,75 +1,35 @@
-const CACHE_NAME = "time-warp-shell-v17";
-const CACHE_PREFIX = "time-warp-shell-";
-const ROOT = new URL("./", self.location.href);
+const CACHE = "time-warp-v24";
 const SHELL = [
-  "",
-  "index.html",
-  "app.css",
-  "core.js",
-  "app.js",
-  "settings.js",
-  "media.js",
-  "round.js",
-  "calculator.js",
-  "manifest.webmanifest",
-  "icon.svg",
-  "icon-180.png",
-  "icon-192.png",
-  "icon-512.png"
-].map((path) => new URL(path, ROOT).href);
+  "./",
+  "./index.html",
+  "./app.css?v=24",
+  "./v24-state.js?v=24",
+  "./v24-editor.js?v=24",
+  "./v24-performance.js?v=24",
+  "./v24-bindings.js?v=24",
+  "./manifest.webmanifest?v=24",
+];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
-  self.skipWaiting();
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(
-        keys
-          .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      ))
-  );
-  self.clients.claim();
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
-self.addEventListener("fetch", (event) => {
-  const request = event.request;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin || !url.pathname.startsWith(ROOT.pathname)) return;
-
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(async () => (
-          (await caches.match(request)) || (await caches.match(new URL("index.html", ROOT).href))
-        ))
-    );
+self.addEventListener("fetch", event => {
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== location.origin) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).then(response => {
+      const copy = response.clone(); caches.open(CACHE).then(cache => cache.put("./index.html",copy)); return response;
+    }).catch(() => caches.match("./index.html")));
     return;
   }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const refreshed = fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || refreshed;
-    })
-  );
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+    if (response.ok) caches.open(CACHE).then(cache => cache.put(event.request,response.clone()));
+    return response;
+  })));
 });

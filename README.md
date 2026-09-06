@@ -1,50 +1,53 @@
 # Time Warp
 
-Time Warp is an installable iPhone performance utility. It presents a personalized lock screen at a secretly chosen number of minutes in the future, then rewinds minute by minute to the real time.
+Time Warp is an installable iPhone performance utility for the lock-screen time-reversal effect. A secretly chosen number of minutes is loaded, the fake lock screen appears that many minutes in the future, then rewinds minute by minute until it reaches the real current time.
 
-## Setup
+## Revamped setup
 
-The app opens to three compact settings pages:
+Setup is deliberately compact and split into **Display**, **Input**, and **Timing**.
 
-- **Display** opens a full-screen wallpaper editor. Drag the clock and date into position, then adjust each element's style, size, thickness, color, and opacity in the floating controls. **Preview** hides the editing controls and uses the exact performance view.
-- **Input** selects tap zones, Clipboard, a Shortcut link, a visible number field, or the optional experimental Calculator. The cover screen is optional and can be black or use a saved image.
-- **Timing** sets the hold and rewind pace and enables the experimental Calculator input.
+- **Display** opens a dedicated full-screen lock-screen editor. Drag the clock and date independently, style each one, upload/replace and position the wallpaper, and add a separate reference-image overlay. The floating editor can live at the top or bottom. **Preview** removes every editor control so the exact performance composition can be checked.
+- **Input** offers invisible tap zones, Clipboard, iPhone Shortcut URL, direct number entry, and the optional experimental Calculator. Tap-zone boundaries and increments are editable, with either a dedicated confirm zone or automatic confirmation on the third tap. The initial cover is optional and can use a custom image instead of black.
+- **Timing** controls the hold before the rewind and the rewind speed, plus the Calculator disguise switch.
 
-Wallpaper, reference screenshot, cover image, appearance, timing, and input choices stay on the device. Images are stored in IndexedDB and are not uploaded.
+Settings are saved in `localStorage`. Wallpaper, reference, and cover images are stored locally in IndexedDB; they are not uploaded by the app.
 
-## Performance
+## Input methods
 
-### Tap zones
+### Invisible tap zones
 
-The default invisible zones add 1, 2, 5, or 10; the bottom area confirms. Their boundaries and values are editable. Turning off the cover shows the map while entering.
+Four adjustable zones add configurable increments. The bottom confirm band can reveal the lock screen, or the app can reveal automatically after three increment taps.
 
 ### Clipboard
 
-With a cover enabled:
+Clipboard content is parsed and validated before reveal. If automatic clipboard access is blocked by iOS, Time Warp provides a manual paste fallback while keeping the fake lock screen hidden.
 
-1. Start the performance.
-2. Run a Shortcut that copies the chosen whole number to the clipboard.
-3. Return to Time Warp and tap the cover.
-4. The app reads and validates the clipboard before it shows the lock screen. WebKit may display a system **Paste** prompt.
+### iPhone Shortcut URL
 
-Without a cover, **Paste & perform** reads the clipboard while the setup button is pressed. If programmatic access is unavailable, the app offers a normal paste field. A failed or invalid read never reveals the lock screen.
+Use either:
 
-### Shortcut link
+`https://magicaleb.github.io/Time-warp/?minutes=NUMBER`
 
-Pass a whole number from 1 through 180 in the URL:
+or:
 
-https://magicaleb.github.io/Time-warp/#minutes=NUMBER
+`https://magicaleb.github.io/Time-warp/#minutes=NUMBER`
 
-The app removes the number from the visible URL as soon as it reads it. A link opened from Shortcuts may open Safari rather than the installed Home Screen app; Clipboard is the reliable bridge back into an already-open PWA.
+The value must be a whole number from 1 through 180. Time Warp removes the secret value from the visible URL after reading it.
 
-### Calculator experiment
+### Direct entry
 
-Enable **Calculator disguise** under Timing, then choose Calculator as the input. It performs ordinary arithmetic. Holding the equals button for 0.7 seconds secretly loads the last number entered, even after showing a calculated result. A normal tap on equals behaves normally.
+Useful for rehearsal and controlled performances.
 
-## Controls
+### Experimental Calculator
 
-- Two-finger swipe down from any performance screen returns to setup.
-- A cover tap reveals a preloaded Number, Shortcut, or Calculator value.
-- The revealed clock fades in before the configured hold and rewind begin.
+Enable the disguise in **Timing**, then select Calculator as the input method. The calculator handles ordinary arithmetic. A normal tap on `=` calculates; holding `=` for 0.7 seconds secretly captures the last number entered and loads it as the chosen minutes.
 
-Use Safari's **Add to Home Screen** for the app-style presentation. The PWA works offline after its shell is cached.
+## Performance controls
+
+- The lock screen fades in on reveal.
+- Two-finger swipe down returns from performance mode to setup.
+- In editor Preview, the same gesture returns to editing.
+- 24-hour time, date visibility, date format, hold duration, and rewind speed are configurable.
+- Flashlight and camera graphics are intentionally not drawn because the intended uploaded screenshot can already contain them.
+
+For the cleanest iPhone presentation, install from Safari using **Add to Home Screen**.
